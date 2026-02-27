@@ -7,6 +7,7 @@ import {
   getMonitorClusters,
   runPromQL,
   triggerRun,
+  getLastRun,
   MonitorSnapshot,
   PodInfo,
   PromQLResult,
@@ -260,8 +261,12 @@ export default function MonitorPage() {
     setRefreshing(true);
     try {
       await triggerRun();
-      // wait a bit for runner to produce new outbox files
-      await new Promise((r) => setTimeout(r, 3000));
+      // Runner async çalışır — tamamlanana kadar poll et (max 90 sn)
+      for (let i = 0; i < 30; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const last = await getLastRun();
+        if (last.status !== "running") break;
+      }
       await Promise.all([load(), reloadMeta()]);
     } finally {
       setRefreshing(false);
