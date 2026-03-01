@@ -5,11 +5,15 @@ import {
   getMonitorPods,
   getMonitorNamespaces,
   getMonitorClusters,
+  getObservePods,
   triggerRun,
   getLastRun,
   MonitorSnapshot,
   PodInfo,
 } from "@/lib/api";
+
+// pod adı → güncel restart sayısı
+type LiveRestarts = Record<string, number>;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -47,7 +51,7 @@ function ts(utc: string) {
 
 // ── PodTable ─────────────────────────────────────────────────────────────────
 
-function PodTable({ pods }: { pods: PodInfo[] }) {
+function PodTable({ pods, liveRestarts }: { pods: PodInfo[]; liveRestarts: LiveRestarts }) {
   if (!pods.length)
     return <p className="text-sm text-gray-400 italic">Pod yok</p>;
   return (
@@ -65,29 +69,42 @@ function PodTable({ pods }: { pods: PodInfo[] }) {
           </tr>
         </thead>
         <tbody>
-          {pods.map((p) => (
-            <tr key={p.pod} className="border-b hover:bg-gray-50">
-              <td className="px-2 py-1.5 font-mono max-w-[180px] truncate" title={p.pod}>
-                {p.pod}
-              </td>
-              <td className="px-2 py-1.5">{readyBadge(p.ready_str)}</td>
-              <td className="px-2 py-1.5 text-center">{p.restarts}</td>
-              <td className="px-2 py-1.5">{p.phase}</td>
-              <td className="px-2 py-1.5 text-orange-600">
-                {[p.waiting, p.terminated].filter(Boolean).join(" / ") || "—"}
-              </td>
-              <td className="px-2 py-1.5 font-mono max-w-[120px] truncate" title={p.node}>
-                {p.node || "—"}
-              </td>
-              <td className="px-2 py-1.5 max-w-[140px] truncate" title={p.workload}>
-                {p.workload || "—"}
-              </td>
-              <td className="px-2 py-1.5 font-mono max-w-[100px] truncate" title={p.image}>
-                {p.image || "—"}
-              </td>
-              <td className="px-2 py-1.5 whitespace-nowrap">{p.created_at || "—"}</td>
-            </tr>
-          ))}
+          {pods.map((p) => {
+            const live = liveRestarts[p.pod];
+            const hasLive = live !== undefined;
+            return (
+              <tr key={p.pod} className="border-b hover:bg-gray-50">
+                <td className="px-2 py-1.5 font-mono max-w-[180px] truncate" title={p.pod}>
+                  {p.pod}
+                </td>
+                <td className="px-2 py-1.5">{readyBadge(p.ready_str)}</td>
+                <td className="px-2 py-1.5 text-center">
+                  {hasLive ? (
+                    <span className="flex items-center justify-center gap-1">
+                      <span className={`font-semibold ${live > p.restarts ? "text-red-600" : ""}`}>{live}</span>
+                      <span className="text-green-500 text-[10px]" title="Canlı veri">●</span>
+                    </span>
+                  ) : (
+                    p.restarts
+                  )}
+                </td>
+                <td className="px-2 py-1.5">{p.phase}</td>
+                <td className="px-2 py-1.5 text-orange-600">
+                  {[p.waiting, p.terminated].filter(Boolean).join(" / ") || "—"}
+                </td>
+                <td className="px-2 py-1.5 font-mono max-w-[120px] truncate" title={p.node}>
+                  {p.node || "—"}
+                </td>
+                <td className="px-2 py-1.5 max-w-[140px] truncate" title={p.workload}>
+                  {p.workload || "—"}
+                </td>
+                <td className="px-2 py-1.5 font-mono max-w-[100px] truncate" title={p.image}>
+                  {p.image || "—"}
+                </td>
+                <td className="px-2 py-1.5 whitespace-nowrap">{p.created_at || "—"}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -98,6 +115,20 @@ function PodTable({ pods }: { pods: PodInfo[] }) {
 
 function SnapshotCard({ snap }: { snap: MonitorSnapshot }) {
   const [open, setOpen] = useState(true);
+  const [liveRestarts, setLiveRestarts] = useState<LiveRestarts>({});
+
+  useEffect(() => {
+    getObservePods(snap.cluster, snap.namespace)
+      .then((pods) => {
+        const map: LiveRestarts = {};
+        pods.forEach((p) => {
+          map[p.name] = p.containers.reduce((s, c) => s + c.restarts, 0);
+        });
+        setLiveRestarts(map);
+      })
+      .catch(() => {});
+  }, [snap.cluster, snap.namespace]);
+
   return (
     <div className="border rounded-lg bg-white shadow-sm mb-3">
       <button
@@ -118,7 +149,7 @@ function SnapshotCard({ snap }: { snap: MonitorSnapshot }) {
       </button>
       {open && (
         <div className="px-4 pb-4">
-          <PodTable pods={snap.pods} />
+          <PodTable pods={snap.pods} liveRestarts={liveRestarts} />
         </div>
       )}
     </div>
