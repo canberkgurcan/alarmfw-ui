@@ -1,0 +1,82 @@
+# alarmfw-ui — Next.js UI (port 3000)
+# Not: NEXT_PUBLIC_* değişkenleri build sırasında image'a baked in.
+# Image'ı Jenkinsfile'da doğru --build-arg ile build et.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alarmfw-ui
+  labels:
+    app: alarmfw-ui
+    app.kubernetes.io/part-of: alarmfw
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alarmfw-ui
+  template:
+    metadata:
+      labels:
+        app: alarmfw-ui
+    spec:
+      containers:
+        - name: alarmfw-ui
+          image: REGISTRY_URL/alarmfw-ui:latest   # Jenkinsfile tarafından güncellenir
+          ports:
+            - containerPort: 3000
+          env:
+            # Server-side (SSR) — container içi servis DNS, runtime'da ayarlanır
+            - name: API_URL
+              value: http://alarmfw-api:8000
+            - name: OBSERVE_URL
+              value: http://alarmfw-observe:8001
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alarmfw-ui
+  labels:
+    app: alarmfw-ui
+    app.kubernetes.io/part-of: alarmfw
+spec:
+  selector:
+    app: alarmfw-ui
+  ports:
+    - port: 3000
+      targetPort: 3000
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: alarmfw-ui
+  labels:
+    app: alarmfw-ui
+    app.kubernetes.io/part-of: alarmfw
+spec:
+  to:
+    kind: Service
+    name: alarmfw-ui
+  port:
+    targetPort: 3000
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
