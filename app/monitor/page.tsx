@@ -5,12 +5,10 @@ import {
   getMonitorPods,
   getMonitorNamespaces,
   getMonitorClusters,
-  runPromQL,
   triggerRun,
   getLastRun,
   MonitorSnapshot,
   PodInfo,
-  PromQLResult,
 } from "@/lib/api";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -127,84 +125,6 @@ function SnapshotCard({ snap }: { snap: MonitorSnapshot }) {
   );
 }
 
-// ── PromQL Panel ──────────────────────────────────────────────────────────────
-
-function PromQLPanel() {
-  const [query, setQuery] = useState("");
-  const [result, setResult] = useState<PromQLResult | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const run = async () => {
-    if (!query.trim()) return;
-    setLoading(true);
-    try {
-      const r = await runPromQL(query.trim());
-      setResult(r);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="border rounded-lg bg-white shadow-sm p-4">
-      <h3 className="text-sm font-semibold text-gray-700 mb-3">PromQL</h3>
-      <div className="flex gap-2">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && run()}
-          placeholder='ör. kube_pod_status_phase{phase="Failed"}'
-          className="flex-1 border rounded px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-300"
-        />
-        <button
-          onClick={run}
-          disabled={loading}
-          className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
-        >
-          {loading ? "..." : "Çalıştır"}
-        </button>
-      </div>
-
-      {result && (
-        <div className="mt-3">
-          {!result.ok ? (
-            <p className="text-red-600 text-sm">{result.error}</p>
-          ) : result.result.length === 0 ? (
-            <p className="text-gray-400 text-sm italic">Sonuç yok</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs border-collapse mt-1">
-                <thead>
-                  <tr className="bg-gray-50 text-gray-500 uppercase tracking-wide">
-                    <th className="px-2 py-1.5 text-left border-b">Metrik</th>
-                    <th className="px-2 py-1.5 text-left border-b">Değer</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.result.map((r, i) => {
-                    const label = Object.entries(r.metric)
-                      .map(([k, v]) => `${k}="${v}"`)
-                      .join(", ");
-                    const val = r.value ? r.value[1] : "—";
-                    return (
-                      <tr key={i} className="border-b hover:bg-gray-50">
-                        <td className="px-2 py-1.5 font-mono text-gray-600 max-w-[400px] break-all">
-                          {`{${label}}`}
-                        </td>
-                        <td className="px-2 py-1.5 font-semibold">{val}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function MonitorPage() {
@@ -220,6 +140,13 @@ export default function MonitorPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [lastFetch,  setLastFetch]  = useState<Date | null>(null);
   const [error,      setError]      = useState("");
+
+  const [autoInterval, setAutoInterval] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      return Number(localStorage.getItem("monitor_interval") ?? 0);
+    }
+    return 0;
+  });
 
   useEffect(() => {
     Promise.all([getMonitorNamespaces(), getMonitorClusters()]).then(
@@ -250,6 +177,18 @@ export default function MonitorPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // auto-refresh timer
+  useEffect(() => {
+    if (!autoInterval) return;
+    const id = setInterval(() => { load(); }, autoInterval * 1000);
+    return () => clearInterval(id);
+  }, [autoInterval, load]);
+
+  const handleIntervalChange = (val: number) => {
+    setAutoInterval(val);
+    localStorage.setItem("monitor_interval", String(val));
+  };
 
   const reloadMeta = useCallback(async () => {
     const [ns, cl] = await Promise.all([getMonitorNamespaces(), getMonitorClusters()]);
@@ -287,14 +226,28 @@ export default function MonitorPage() {
               : "Yükleniyor..."}
           </p>
         </div>
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing || loading}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
-        >
-          <span>{refreshing ? "⟳" : "↻"}</span>
-          {refreshing ? "Çalışıyor..." : "Yenile"}
-        </button>
+        <div className="flex items-center gap-2">
+          <select
+            value={autoInterval}
+            onChange={(e) => handleIntervalChange(Number(e.target.value))}
+            className="border rounded px-2 py-1.5 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
+            title="Otomatik yenileme aralığı"
+          >
+            <option value={0}>Otomatik yenileme kapalı</option>
+            <option value={30}>30 saniye</option>
+            <option value={60}>1 dakika</option>
+            <option value={120}>2 dakika</option>
+            <option value={300}>5 dakika</option>
+          </select>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing || loading}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
+            <span>{refreshing ? "⟳" : "↻"}</span>
+            {refreshing ? "Çalışıyor..." : "Yenile"}
+          </button>
+        </div>
       </div>
 
       {/* Filter Tabs */}
@@ -394,8 +347,6 @@ export default function MonitorPage() {
         </div>
       )}
 
-      {/* PromQL */}
-      <PromQLPanel />
     </div>
   );
 }

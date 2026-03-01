@@ -9,9 +9,11 @@ export default async function DashboardPage() {
     getAlarmState().catch(() => []),
   ]);
 
+  // State'ten sayım (her alarm'ın güncel durumu)
   const counts = { OK: 0, PROBLEM: 0, ERROR: 0 };
-  for (const a of alarms) {
-    if (a.status in counts) counts[a.status as keyof typeof counts]++;
+  for (const s of state) {
+    const st = s.last_status as keyof typeof counts;
+    if (st in counts) counts[st]++;
   }
 
   return (
@@ -36,17 +38,17 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      {/* Alarm table */}
+      {/* Recent alarms from SQLite */}
       <div className="bg-white rounded-lg shadow-sm border">
         <div className="flex items-center justify-between px-5 py-4 border-b">
-          <h2 className="font-semibold">Recent Alarms</h2>
-          <span className="text-sm text-gray-400">{alarms.length} entries</span>
+          <h2 className="font-semibold">Son Alarmlar</h2>
+          <span className="text-sm text-gray-400">{alarms.length} kayıt</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 text-left text-gray-500 text-xs uppercase">
-                <th className="px-4 py-3">Time</th>
+                <th className="px-4 py-3">Zaman</th>
                 <th className="px-4 py-3">Alarm</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Severity</th>
@@ -57,14 +59,14 @@ export default async function DashboardPage() {
             </thead>
             <tbody>
               {alarms.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">No alarms yet</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Henüz alarm yok</td></tr>
               )}
-              {alarms.map((a) => {
+              {alarms.map((a, i) => {
                 const ev = (a.evidence ?? {}) as Record<string, unknown>;
                 return (
-                  <tr key={a._filename} className="border-t hover:bg-gray-50">
+                  <tr key={i} className="border-t hover:bg-gray-50">
                     <td className="px-4 py-3 text-gray-400 whitespace-nowrap font-mono text-xs">
-                      {a.timestamp_utc.replace("T", " ").replace("Z", "")}
+                      {a.timestamp_utc?.replace("T", " ").replace("Z", "") ?? "—"}
                     </td>
                     <td className="px-4 py-3 font-medium max-w-xs truncate">{a.alarm_name}</td>
                     <td className="px-4 py-3"><StatusBadge status={a.status} /></td>
@@ -80,32 +82,36 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* State table */}
+      {/* Dedup State table */}
       {state.length > 0 && (
         <div className="bg-white rounded-lg shadow-sm border mt-6">
           <div className="px-5 py-4 border-b">
-            <h2 className="font-semibold">Dedup State</h2>
+            <h2 className="font-semibold">Alarm Durumları</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 text-left text-gray-500 text-xs uppercase">
-                  <th className="px-4 py-3">Dedup Key</th>
-                  <th className="px-4 py-3">Last Status</th>
-                  <th className="px-4 py-3">Last Sent</th>
-                  <th className="px-4 py-3">Last Change</th>
+                  <th className="px-4 py-3">Alarm</th>
+                  <th className="px-4 py-3">Durum</th>
+                  <th className="px-4 py-3">Son Bildirim</th>
+                  <th className="px-4 py-3">Son Değişim</th>
                 </tr>
               </thead>
               <tbody>
                 {state.map((s) => (
                   <tr key={s.dedup_key} className="border-t hover:bg-gray-50">
-                    <td className="px-4 py-2 font-mono text-xs text-gray-500">{s.dedup_key.slice(0, 16)}…</td>
+                    <td className="px-4 py-2 text-sm text-gray-700">
+                      {s.alarm_name ?? (
+                        <span className="font-mono text-xs text-gray-400">{s.dedup_key.slice(0, 20)}…</span>
+                      )}
+                    </td>
                     <td className="px-4 py-2"><StatusBadge status={s.last_status} /></td>
                     <td className="px-4 py-2 text-gray-500 text-xs">
-                      {s.last_sent_ts ? new Date(s.last_sent_ts * 1000).toISOString().replace("T"," ").slice(0,19) : "—"}
+                      {s.last_sent_ts ? new Date(s.last_sent_ts * 1000).toISOString().replace("T", " ").slice(0, 19) : "—"}
                     </td>
                     <td className="px-4 py-2 text-gray-500 text-xs">
-                      {s.last_change_ts ? new Date(s.last_change_ts * 1000).toISOString().replace("T"," ").slice(0,19) : "—"}
+                      {s.last_change_ts ? new Date(s.last_change_ts * 1000).toISOString().replace("T", " ").slice(0, 19) : "—"}
                     </td>
                   </tr>
                 ))}
