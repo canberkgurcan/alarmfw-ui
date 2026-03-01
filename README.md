@@ -53,7 +53,21 @@ docker build \
 
 ```bash
 oc apply -f ocp/deployment.yaml -n alarmfw-prod
+oc set image deployment/alarmfw-ui alarmfw-ui=REGISTRY/alarmfw-ui:TAG -n alarmfw-prod
 oc get route alarmfw-ui -n alarmfw-prod
 ```
 
-Pipeline: `Jenkinsfile` (`OCP_APPS_DOMAIN` değişkeni ile `--build-arg` otomatik ayarlanır)
+## Jenkins Pipeline
+
+4 stage: **Checkout SCM → Docker Build → Nexus Push → OCP Deploy**
+
+`NEXT_PUBLIC_*` URL'leri `OCP_APPS_DOMAIN` üzerinden otomatik türetilir ve `--build-arg` ile image'a baked-in olur.
+
+| Değişken | Açıklama |
+|---|---|
+| `REGISTRY_URL` | Nexus registry adresi |
+| `REGISTRY_CREDS` | Jenkins credential ID (Docker kullanıcı/şifre) |
+| `OCP_API_URL` | OpenShift API endpoint |
+| `OCP_TOKEN_CREDS` | Jenkins credential ID (OCP service account token) |
+| `DEPLOY_NAMESPACE` | Deploy namespace (ör: `alarmfw-prod`) |
+| `OCP_APPS_DOMAIN` | OCP apps domain (ör: `apps.cluster.local`) |
