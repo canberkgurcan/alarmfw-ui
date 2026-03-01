@@ -29,21 +29,12 @@ export const getAlarms = (limit = 50, status?: string) =>
 
 export const getAlarmState = () => req<AlarmState[]>("/api/alarms/state");
 
-export const clearOutbox = () =>
-  req<{ deleted: number }>("/api/alarms/outbox", { method: "DELETE" });
-
 // ── Checks ────────────────────────────────────────────
 export const getChecks = () => req<Check[]>("/api/checks");
-export const getCheck  = (name: string) => req<Check>(`/api/checks/${name}`);
 export const updateCheck = (name: string, body: Check) =>
   req<{ ok: boolean }>(`/api/checks/${name}`, { method: "PUT", body: JSON.stringify(body) });
 export const deleteCheck = (name: string) =>
   req<{ ok: boolean }>(`/api/checks/${name}`, { method: "DELETE" });
-
-// ── Notifiers ─────────────────────────────────────────
-export const getNotifiers = () => req<Record<string, Notifier>>("/api/notifiers");
-export const updateNotifier = (name: string, body: Notifier) =>
-  req<{ ok: boolean }>(`/api/notifiers/${name}`, { method: "PUT", body: JSON.stringify(body) });
 
 // ── Secrets ───────────────────────────────────────────
 export const getSecrets = () => req<Secret[]>("/api/secrets");
@@ -68,14 +59,8 @@ export const getEnv = () => req<Record<string, string>>("/api/env");
 export const updateEnv = (body: Record<string, string>) =>
   req<{ ok: boolean }>("/api/env", { method: "PUT", body: JSON.stringify(body) });
 
-// ── Policies ──────────────────────────────────────────
-export const getDedupPolicy = () => req<DedupPolicy>("/api/policies/dedup");
-export const updateDedupPolicy = (body: DedupPolicy) =>
-  req<{ ok: boolean }>("/api/policies/dedup", { method: "PUT", body: JSON.stringify(body) });
-
 // ── Config (namespaces + clusters) ────────────────────
 export const getNamespaces   = () => req<Namespace[]>("/api/config/namespaces");
-export const getNamespace    = (name: string) => req<Namespace>(`/api/config/namespaces/${name}`);
 export const upsertNamespace = (name: string, body: Namespace) =>
   req<{ ok: boolean; generated_checks: number }>(`/api/config/namespaces/${name}`, { method: "PUT", body: JSON.stringify(body) });
 export const deleteNamespace = (name: string) =>
@@ -109,6 +94,7 @@ export interface AlarmState {
   last_status: string;
   last_sent_ts: number | null;
   last_change_ts: number | null;
+  alarm_name?: string | null;
 }
 
 export interface Check {
@@ -118,11 +104,6 @@ export interface Check {
   params?: Record<string, string>;
   notify?: { primary: string[]; fallback: string[] };
   _source_file?: string;
-}
-
-export interface Notifier {
-  type: string;
-  [key: string]: unknown;
 }
 
 export interface Secret {
@@ -140,13 +121,6 @@ export interface RunResult {
   duration_sec?: number;
   config?: string;
   started_at?: number;
-}
-
-export interface DedupPolicy {
-  repeat_interval_sec?: number;
-  error_repeat_interval_sec?: number;
-  recovery_notify?: boolean;
-  recovery_cooldown_sec?: number;
 }
 
 export interface Namespace {
@@ -185,6 +159,7 @@ async function obsReq<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
+export const getObserveAuth = () => obsReq<ObserveAuth>("/api/observe/auth");
 export const getObserveClusters = () => obsReq<ObserveCluster[]>("/api/observe/clusters");
 
 export const getObserveNamespaces = (cluster: string) =>
@@ -205,6 +180,33 @@ export const runObservePromQL = (cluster: string, query: string, time?: string) 
     method: "POST",
     body: JSON.stringify({ cluster, query, ...(time ? { time } : {}) }),
   });
+
+export const getObserveAlerts = () =>
+  obsReq<PromQLResult>("/api/observe/alerts");
+
+export const getObserveNamespaceSummary = (cluster: string, namespace: string) =>
+  obsReq<NamespaceSummary>(
+    `/api/observe/namespace-summary?cluster=${encodeURIComponent(cluster)}&namespace=${encodeURIComponent(namespace)}`
+  );
+
+export const getObservePodMetrics = (pod: string, namespace: string) =>
+  obsReq<{ cpu: PromQLResult; memory: PromQLResult }>(
+    `/api/observe/pod-metrics?pod=${encodeURIComponent(pod)}&namespace=${encodeURIComponent(namespace)}`
+  );
+
+export interface NamespaceSummary {
+  running: number;
+  failed: number;
+  pending: number;
+  total_restarts: number;
+  warning_events: number;
+}
+
+export interface ObserveAuth {
+  logged_in: boolean;
+  has_token: boolean;
+  has_prom_url: boolean;
+}
 
 export interface ObserveCluster {
   name: string;
@@ -238,6 +240,32 @@ export interface ObserveEvent {
   kind: string | null;
 }
 
+// ── Terminal ───────────────────────────────────────────
+export const execTerminalCommand = (command: string) =>
+  req<TerminalResult>("/api/terminal/exec", {
+    method: "POST",
+    body: JSON.stringify({ command }),
+  });
+
+export const getTerminalWhoami = () =>
+  req<{ logged_in: boolean; user: string | null }>("/api/terminal/whoami");
+
+export const getTerminalClusters = () =>
+  req<{ name: string; ocp_api: string }[]>("/api/terminal/clusters");
+
+export const terminalLogin = (cluster: string) =>
+  req<TerminalResult>("/api/terminal/login", {
+    method: "POST",
+    body: JSON.stringify({ cluster }),
+  });
+
+export interface TerminalResult {
+  ok: boolean;
+  stdout: string;
+  stderr: string;
+  exit_code: number;
+}
+
 // ── Monitor ────────────────────────────────────────────
 export const getMonitorPods = (params: { cluster?: string; namespace?: string }) => {
   const q = new URLSearchParams();
@@ -249,12 +277,6 @@ export const getMonitorPods = (params: { cluster?: string; namespace?: string })
 
 export const getMonitorNamespaces = () => req<string[]>("/api/monitor/namespaces");
 export const getMonitorClusters   = () => req<string[]>("/api/monitor/clusters");
-
-export const runPromQL = (query: string, time?: string) =>
-  req<PromQLResult>("/api/monitor/promql", {
-    method: "POST",
-    body: JSON.stringify({ query, ...(time ? { time } : {}) }),
-  });
 
 export interface PodInfo {
   pod: string;

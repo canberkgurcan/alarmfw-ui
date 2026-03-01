@@ -10,11 +10,12 @@ const TOP_NAV = [
 ];
 
 const MANAGE_NAV = [
-  { href: "/checks",  label: "Checks",  icon: "✓" },
-  { href: "/config",  label: "Config",  icon: "⊞" },
-  { href: "/run",     label: "Run",     icon: "▶" },
-  { href: "/secrets", label: "Secrets", icon: "🔑" },
-  { href: "/env",     label: "Env",     icon: "⚙" },
+  { href: "/checks",         label: "Checks",         icon: "✓" },
+  { href: "/config",         label: "Config",         icon: "⊞" },
+  { href: "/run",            label: "Run",            icon: "▶" },
+  { href: "/secrets",        label: "Secrets",        icon: "🔑" },
+  { href: "/env",            label: "Env",            icon: "⚙" },
+  { href: "/admin-console",  label: "Admin Console",  icon: "⌨" },
 ];
 
 export default function Sidebar() {
