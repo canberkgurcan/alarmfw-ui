@@ -54,11 +54,6 @@ export const triggerRun = (config?: string) =>
   });
 export const getLastRun = () => req<RunResult>("/api/run/last");
 
-// ── Env ───────────────────────────────────────────────
-export const getEnv = () => req<Record<string, string>>("/api/env");
-export const updateEnv = (body: Record<string, string>) =>
-  req<{ ok: boolean }>("/api/env", { method: "PUT", body: JSON.stringify(body) });
-
 // ── Config (namespaces + clusters) ────────────────────
 export const getNamespaces   = () => req<Namespace[]>("/api/config/namespaces");
 export const upsertNamespace = (name: string, body: Namespace) =>
