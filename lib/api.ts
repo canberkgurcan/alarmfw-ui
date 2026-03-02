@@ -315,6 +315,33 @@ export interface MonitorSnapshot {
   pods: PodInfo[];
 }
 
+// ── Admin / Zabbix ────────────────────────────────────
+export const getZabbixNamespaces = () =>
+  req<ZabbixNamespace[]>("/api/admin/zabbix-namespaces");
+
+export const sendZabbixEvent = (namespace: string, type: "1" | "2") =>
+  req<ZabbixSendResult>("/api/admin/zabbix-send", {
+    method: "POST",
+    body: JSON.stringify({ namespace, type }),
+  });
+
+export interface ZabbixNamespace {
+  name: string;
+  severity: string;
+  alertgroup: string;
+  alertkey: string;
+  node: string;
+  department: string;
+}
+
+export interface ZabbixSendResult {
+  ok: boolean;
+  status_code?: number;
+  response?: unknown;
+  error?: string;
+  payload: Record<string, string>;
+}
+
 export interface PromQLResult {
   ok: boolean;
   error?: string;

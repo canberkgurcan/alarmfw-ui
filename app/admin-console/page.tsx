@@ -6,7 +6,11 @@ import {
   getTerminalWhoami,
   getTerminalClusters,
   terminalLogin,
+  getZabbixNamespaces,
+  sendZabbixEvent,
   TerminalResult,
+  ZabbixNamespace,
+  ZabbixSendResult,
 } from "@/lib/api";
 
 type HistoryEntry = { cmd: string; result: TerminalResult };
@@ -22,9 +26,19 @@ export default function AdminConsolePage() {
   const outputRef = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLInputElement>(null);
 
+  // Zabbix state
+  const [zbxNamespaces, setZbxNamespaces] = useState<ZabbixNamespace[]>([]);
+  const [zbxSelected, setZbxSelected]     = useState<string>("");
+  const [zbxSending, setZbxSending]       = useState<"1" | "2" | null>(null);
+  const [zbxResult, setZbxResult]         = useState<ZabbixSendResult | null>(null);
+  const [zbxError, setZbxError]           = useState<string>("");
+
   useEffect(() => {
     getTerminalWhoami().then((r) => setWhoami(r.logged_in ? r.user : null)).catch(() => {});
     getTerminalClusters().then(setClusters).catch(() => {});
+    getZabbixNamespaces()
+      .then((ns) => { setZbxNamespaces(ns); if (ns.length > 0) setZbxSelected(ns[0].name); })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -53,6 +67,23 @@ export default function AdminConsolePage() {
       inputRef.current?.focus();
     }
   };
+
+  const zbxSend = async (type: "1" | "2") => {
+    if (!zbxSelected) return;
+    setZbxSending(type);
+    setZbxResult(null);
+    setZbxError("");
+    try {
+      const res = await sendZabbixEvent(zbxSelected, type);
+      setZbxResult(res);
+    } catch (e: unknown) {
+      setZbxError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setZbxSending(null);
+    }
+  };
+
+  const zbxNs = zbxNamespaces.find((n) => n.name === zbxSelected);
 
   const login = async (clusterName: string) => {
     if (loading) return;
@@ -198,6 +229,102 @@ export default function AdminConsolePage() {
           />
           {loading && <span className="text-gray-600 text-xs shrink-0">çalışıyor...</span>}
         </div>
+      </div>
+
+      {/* ── Zabbix Event Gönder ── */}
+      <div>
+        <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-3">Zabbix Event Gönder</h2>
+
+        {zbxNamespaces.length === 0 ? (
+          <p className="text-sm text-gray-500">
+            Zabbix etkin namespace bulunamadı. Config sayfasından bir namespace için Zabbix Enabled işaretleyin.
+          </p>
+        ) : (
+          <div className="bg-white dark:bg-gray-900 border rounded-xl shadow-sm p-5 space-y-4">
+            {/* Namespace seç */}
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-gray-600 dark:text-gray-400 shrink-0">Namespace</label>
+              <select
+                value={zbxSelected}
+                onChange={(e) => { setZbxSelected(e.target.value); setZbxResult(null); setZbxError(""); }}
+                className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200"
+              >
+                {zbxNamespaces.map((n) => (
+                  <option key={n.name} value={n.name}>{n.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Payload önizleme */}
+            {zbxNs && (
+              <div className="font-mono text-xs bg-gray-50 dark:bg-gray-800 border rounded-lg p-3 space-y-0.5 text-gray-700 dark:text-gray-300 leading-relaxed">
+                <div><span className="text-purple-500">&quot;type&quot;</span>: <span className="text-orange-500">&quot;1&quot;</span> | <span className="text-orange-500">&quot;2&quot;</span></div>
+                <div><span className="text-purple-500">&quot;severity&quot;</span>: <span className="text-green-600">&quot;{zbxNs.severity}&quot;</span></div>
+                <div><span className="text-purple-500">&quot;alertgroup&quot;</span>: <span className="text-green-600">&quot;{zbxNs.alertgroup}&quot;</span></div>
+                <div><span className="text-purple-500">&quot;alertkey&quot;</span>: <span className="text-green-600">&quot;{zbxNs.alertkey}&quot;</span></div>
+                <div><span className="text-purple-500">&quot;node&quot;</span>: <span className="text-green-600">&quot;{zbxNs.node}&quot;</span></div>
+                <div><span className="text-purple-500">&quot;department&quot;</span>: <span className="text-green-600">&quot;{zbxNs.department}&quot;</span></div>
+                <div><span className="text-purple-500">&quot;occurrencedate&quot;</span>: <span className="text-gray-400">[gönderim anı]</span></div>
+                <div><span className="text-purple-500">&quot;tablename&quot;</span>: <span className="text-green-600">&quot;italarm&quot;</span></div>
+              </div>
+            )}
+
+            {/* Butonlar */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => zbxSend("1")}
+                disabled={!!zbxSending}
+                className="px-5 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                {zbxSending === "1" ? "Gönderiliyor…" : "⚠ Alarm"}
+              </button>
+              <button
+                onClick={() => zbxSend("2")}
+                disabled={!!zbxSending}
+                className="px-5 py-2 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+              >
+                {zbxSending === "2" ? "Gönderiliyor…" : "✓ Clear"}
+              </button>
+            </div>
+
+            {/* Hata */}
+            {zbxError && (
+              <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg px-4 py-2">
+                {zbxError}
+              </div>
+            )}
+
+            {/* Sonuç */}
+            {zbxResult && (
+              <div className="border rounded-lg overflow-hidden text-xs font-mono">
+                <div className={`px-4 py-2 font-sans text-sm font-medium flex gap-2 items-center ${
+                  zbxResult.ok
+                    ? "bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-400 border-b border-green-200 dark:border-green-800"
+                    : "bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-400 border-b border-red-200 dark:border-red-800"
+                }`}>
+                  <span>{zbxResult.ok ? "✓ Başarılı" : "✗ Başarısız"}</span>
+                  {zbxResult.status_code != null && (
+                    <span className="opacity-60">HTTP {zbxResult.status_code}</span>
+                  )}
+                </div>
+                <div className="p-3 bg-gray-50 dark:bg-gray-800 space-y-3">
+                  <div>
+                    <p className="text-gray-500 mb-1 text-xs">Gönderilen payload</p>
+                    <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">
+                      {JSON.stringify(zbxResult.payload, null, 2)}
+                    </pre>
+                  </div>
+                  <div>
+                    <p className="text-gray-500 mb-1 text-xs">{zbxResult.error ? "Hata" : "Zabbix yanıtı"}</p>
+                    <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">
+                      {zbxResult.error ?? JSON.stringify(zbxResult.response, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
