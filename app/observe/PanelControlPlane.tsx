@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { getHealthControlPlane, type HealthControlPlane, type PromMetric } from "@/lib/api";
+import QueryErrorBanner from "./QueryErrorBanner";
 
 function fmtBytes(v: string | undefined): string {
   const n = parseFloat(v ?? "");
@@ -96,6 +97,7 @@ export default function PanelControlPlane({ cluster }: { cluster: string }) {
         <button onClick={load} className="ml-auto text-xs px-2 py-1 border rounded hover:bg-gray-50 text-gray-500">↻ Yenile</button>
       </div>
 
+      <QueryErrorBanner errors={data?.errors} />
       <div className="flex-1 overflow-auto p-5 space-y-4">
         {error && <p className="text-red-600 text-sm">{error}</p>}
         {!cluster && <p className="text-gray-400 text-sm italic">Cluster seçin.</p>}

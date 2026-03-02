@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { getHealthWorkload, type HealthWorkload, type PromMetric } from "@/lib/api";
+import QueryErrorBanner from "./QueryErrorBanner";
 
 type WorkloadTab = "crashloop" | "oomkilled" | "imagepull" | "pending" | "unavailable" | "failed_jobs";
 
@@ -87,7 +88,6 @@ export default function PanelWorkload({ cluster }: { cluster: string }) {
   };
 
   const currentRows: PromMetric[] = data ? (data[activeTab] ?? []) : [];
-  const currentTab = SUB_TABS.find((t) => t.key === activeTab)!;
 
   const colMap: Record<WorkloadTab, string[]> = {
     crashloop:   ["Namespace", "Pod", "Container", "Count"],
@@ -107,6 +107,7 @@ export default function PanelWorkload({ cluster }: { cluster: string }) {
         <button onClick={load} className="ml-auto text-xs px-2 py-1 border rounded hover:bg-gray-50 text-gray-500">↻ Yenile</button>
       </div>
 
+      <QueryErrorBanner errors={data?.errors} />
       {/* Sub-tabs */}
       <div className="flex gap-1 px-5 py-2 border-b shrink-0 flex-wrap bg-gray-50">
         {SUB_TABS.map((t) => {

@@ -1,6 +1,7 @@
 "use client";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { getHealthCapacity, type HealthCapacity, type PromMetric } from "@/lib/api";
+import QueryErrorBanner from "./QueryErrorBanner";
 
 function fmtVal(v: string | undefined): string {
   const n = parseFloat(v ?? "");
@@ -122,7 +123,6 @@ function QuotaSection({ used, hard }: { used: PromMetric[]; hard: PromMetric[] }
                                ratio !== null && ratio >= 0.7 ? "text-yellow-600" : "text-gray-600";
               const resource = m.metric.resource || "—";
               const isMem    = resource.includes("memory");
-              const fmt      = isMem ? fmtBytes : fmtVal;
               return (
                 <tr key={i} className="border-b hover:bg-gray-50">
                   <td className="px-3 py-1.5 font-mono max-w-[160px] truncate" title={m.metric.namespace}>{m.metric.namespace || "—"}</td>
@@ -204,6 +204,7 @@ export default function PanelCapacity({ cluster }: { cluster: string }) {
         <button onClick={load} className="ml-auto text-xs px-2 py-1 border rounded hover:bg-gray-50 text-gray-500">↻ Yenile</button>
       </div>
 
+      <QueryErrorBanner errors={data?.errors} />
       <div className="flex-1 overflow-auto p-5 space-y-4">
         {error && <p className="text-red-600 text-sm">{error}</p>}
         {!cluster && <p className="text-gray-400 text-sm italic">Cluster seçin.</p>}

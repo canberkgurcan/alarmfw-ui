@@ -254,6 +254,7 @@ export interface HealthAlertsResult {
 
 export interface HealthNodes {
   ok: boolean;
+  errors?: Record<string, string>;
   notready: PromMetric[];
   pressure: PromMetric[];
   cpu: PromMetric[];
@@ -263,6 +264,7 @@ export interface HealthNodes {
 
 export interface HealthWorkload {
   ok: boolean;
+  errors?: Record<string, string>;
   crashloop: PromMetric[];
   oomkilled: PromMetric[];
   imagepull: PromMetric[];
@@ -273,6 +275,7 @@ export interface HealthWorkload {
 
 export interface HealthCapacity {
   ok: boolean;
+  errors?: Record<string, string>;
   cpu_ratio: PromMetric[];
   cpu_abs: PromMetric[];
   quota_used: PromMetric[];
@@ -282,6 +285,7 @@ export interface HealthCapacity {
 
 export interface HealthControlPlane {
   ok: boolean;
+  errors?: Record<string, string>;
   etcd_db_size: PromMetric[];
   etcd_has_leader: PromMetric[];
   etcd_leader_changes: PromMetric[];
