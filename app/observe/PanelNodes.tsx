@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { getHealthNodes, type HealthNodes, type PromMetric } from "@/lib/api";
+import QueryErrorBanner from "./QueryErrorBanner";
 
 function pct(m: PromMetric): number {
   return parseFloat(m.value?.[1] ?? "0");
@@ -67,6 +68,7 @@ export default function PanelNodes({ cluster }: { cluster: string }) {
         <button onClick={load} className="ml-auto text-xs px-2 py-1 border rounded hover:bg-gray-50 text-gray-500">↻ Yenile</button>
       </div>
 
+      <QueryErrorBanner errors={data?.errors} />
       <div className="flex-1 overflow-auto p-5 space-y-4">
         {error && <p className="text-red-600 text-sm">{error}</p>}
         {!cluster && <p className="text-gray-400 text-sm italic">Cluster seçin.</p>}
