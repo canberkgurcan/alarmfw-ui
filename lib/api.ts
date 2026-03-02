@@ -196,18 +196,19 @@ export const runObservePromQL = (cluster: string, query: string, time?: string) 
     body: JSON.stringify({ cluster, query, ...(time ? { time } : {}) }),
   });
 
-export const getObserveAlerts = () =>
-  obsReq<PromQLResult>("/api/observe/alerts");
+export const getObserveAlerts = (cluster = "") =>
+  obsReq<PromQLResult>(`/api/observe/alerts${cluster ? `?cluster=${encodeURIComponent(cluster)}` : ""}`);
 
 export const getObserveNamespaceSummary = (cluster: string, namespace: string) =>
   obsReq<NamespaceSummary>(
     `/api/observe/namespace-summary?cluster=${encodeURIComponent(cluster)}&namespace=${encodeURIComponent(namespace)}`
   );
 
-export const getObservePodMetrics = (pod: string, namespace: string) =>
-  obsReq<{ cpu: PromQLResult; memory: PromQLResult }>(
-    `/api/observe/pod-metrics?pod=${encodeURIComponent(pod)}&namespace=${encodeURIComponent(namespace)}`
-  );
+export const getObservePodMetrics = (pod: string, namespace: string, cluster = "") => {
+  const q = new URLSearchParams({ pod, namespace });
+  if (cluster) q.set("cluster", cluster);
+  return obsReq<{ cpu: PromQLResult; memory: PromQLResult }>(`/api/observe/pod-metrics?${q.toString()}`);
+};
 
 export interface NamespaceSummary {
   running: number;
