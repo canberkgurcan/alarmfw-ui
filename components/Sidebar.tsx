@@ -14,7 +14,6 @@ const MANAGE_NAV = [
   { href: "/config",         label: "Config",         icon: "⊞" },
   { href: "/run",            label: "Run",            icon: "▶" },
   { href: "/secrets",        label: "Secrets",        icon: "🔑" },
-  { href: "/env",            label: "Env",            icon: "⚙" },
   { href: "/admin-console",  label: "Admin Console",  icon: "⌨" },
 ];
 
