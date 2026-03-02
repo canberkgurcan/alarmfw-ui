@@ -7,7 +7,6 @@ import {
   getObservePods,
   getObserveEvents,
   runObservePromQL,
-  getObserveAlerts,
   getObserveNamespaceSummary,
   getObservePodMetrics,
   type ObserveAuth,
@@ -18,7 +17,14 @@ import {
   type NamespaceSummary,
 } from "@/lib/api";
 
-type Tab = "pods" | "events" | "promql" | "alerts";
+import PanelOverview     from "./PanelOverview";
+import PanelAlerts       from "./PanelAlerts";
+import PanelNodes        from "./PanelNodes";
+import PanelWorkload     from "./PanelWorkload";
+import PanelCapacity     from "./PanelCapacity";
+import PanelControlPlane from "./PanelControlPlane";
+
+type Tab = "overview" | "alerts" | "nodes" | "workload" | "capacity" | "controlplane" | "pods" | "events" | "promql";
 
 const QUICK_QUERIES = [
   { label: "Top 10 CPU kullanan pod",    query: 'topk(10, sum(rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[5m])) by (pod, namespace))' },
@@ -49,15 +55,7 @@ function fmtMem(val: string): string {
 
 // ── Pod Drawer ─────────────────────────────────────────────────────────────────
 
-function PodDrawer({
-  pod,
-  cluster,
-  onClose,
-}: {
-  pod: ObservePod;
-  cluster: string;
-  onClose: () => void;
-}) {
+function PodDrawer({ pod, cluster, onClose }: { pod: ObservePod; cluster: string; onClose: () => void }) {
   const [metrics, setMetrics] = useState<{ cpu: PromQLResult; memory: PromQLResult } | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [events, setEvents]   = useState<ObserveEvent[]>([]);
@@ -66,15 +64,10 @@ function PodDrawer({
   useEffect(() => {
     setMetricsLoading(true);
     getObservePodMetrics(pod.name, pod.namespace, cluster)
-      .then(setMetrics)
-      .catch(() => {})
-      .finally(() => setMetricsLoading(false));
-
+      .then(setMetrics).catch(() => {}).finally(() => setMetricsLoading(false));
     setEvLoading(true);
     getObserveEvents(cluster, pod.namespace, pod.name)
-      .then(setEvents)
-      .catch(() => {})
-      .finally(() => setEvLoading(false));
+      .then(setEvents).catch(() => {}).finally(() => setEvLoading(false));
   }, [pod.name, pod.namespace, cluster]);
 
   const cpuMap: Record<string, string> = {};
@@ -88,7 +81,6 @@ function PodDrawer({
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="flex-1 bg-black/20" onClick={onClose} />
       <div className="w-[480px] bg-white shadow-xl flex flex-col overflow-hidden">
-        {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b bg-gray-50 shrink-0">
           <div className="min-w-0">
             <div className="font-mono text-sm font-semibold text-gray-800 truncate" title={pod.name}>{pod.name}</div>
@@ -96,28 +88,16 @@ function PodDrawer({
           </div>
           <button onClick={onClose} className="ml-3 shrink-0 text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
         </div>
-
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
-          {/* Phase + restarts */}
           <div className="flex gap-2 flex-wrap text-xs">
-            <span className={`px-2 py-1 rounded-full font-semibold ${
-              pod.phase === "Running" ? "bg-green-100 text-green-700" :
-              pod.phase === "Pending" ? "bg-yellow-100 text-yellow-700" :
-                                        "bg-red-100 text-red-700"
-            }`}>{pod.phase}</span>
+            <span className={`px-2 py-1 rounded-full font-semibold ${pod.phase === "Running" ? "bg-green-100 text-green-700" : pod.phase === "Pending" ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"}`}>{pod.phase}</span>
             {totalRestarts > 0 && (
-              <span className={`px-2 py-1 rounded-full font-semibold ${
-                totalRestarts >= 10 ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"
-              }`}>↻ {totalRestarts} restart</span>
+              <span className={`px-2 py-1 rounded-full font-semibold ${totalRestarts >= 10 ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}`}>↻ {totalRestarts} restart</span>
             )}
             {pod.created_at && (
-              <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-500">
-                {pod.created_at.replace("T", " ").replace("Z", "")}
-              </span>
+              <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-500">{pod.created_at.replace("T", " ").replace("Z", "")}</span>
             )}
           </div>
-
-          {/* Containers */}
           <div>
             <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Containers</div>
             <div className="space-y-1">
@@ -125,40 +105,28 @@ function PodDrawer({
                 <div key={c.name} className="flex items-center gap-2 bg-gray-50 rounded px-3 py-2 text-xs">
                   <span className={`w-2 h-2 rounded-full shrink-0 ${c.ready ? "bg-green-500" : "bg-red-500"}`} />
                   <span className="font-mono font-medium text-gray-700 flex-1 truncate min-w-0" title={c.name}>{c.name}</span>
-                  {metricsLoading ? (
-                    <span className="text-gray-300">...</span>
-                  ) : (
+                  {metricsLoading ? <span className="text-gray-300">...</span> : (
                     <>
                       {cpuMap[c.name] && <span className="text-gray-500 shrink-0">CPU {fmtCpu(cpuMap[c.name])}</span>}
                       {memMap[c.name] && <span className="text-gray-500 shrink-0">{fmtMem(memMap[c.name])}</span>}
                     </>
                   )}
                   {c.restarts > 0 && (
-                    <span className={`shrink-0 px-1.5 py-0.5 rounded font-semibold ${
-                      c.restarts >= 10 ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"
-                    }`}>↻{c.restarts}</span>
+                    <span className={`shrink-0 px-1.5 py-0.5 rounded font-semibold ${c.restarts >= 10 ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}`}>↻{c.restarts}</span>
                   )}
                 </div>
               ))}
             </div>
           </div>
-
-          {/* Recent Events */}
           <div>
             <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Son Events</div>
-            {evLoading ? (
-              <p className="text-xs text-gray-400">Yükleniyor...</p>
-            ) : events.length === 0 ? (
+            {evLoading ? <p className="text-xs text-gray-400">Yükleniyor...</p> : events.length === 0 ? (
               <p className="text-xs text-gray-400 italic">Event yok</p>
             ) : (
               <div className="space-y-1 max-h-52 overflow-y-auto">
                 {events.slice(0, 12).map((e, i) => (
-                  <div key={i} className={`flex gap-2 text-xs rounded px-2 py-1.5 ${
-                    e.type === "Warning" ? "bg-yellow-50" : "bg-gray-50"
-                  }`}>
-                    <span className={`shrink-0 font-semibold ${e.type === "Warning" ? "text-yellow-700" : "text-blue-600"}`}>
-                      {e.reason}
-                    </span>
+                  <div key={i} className={`flex gap-2 text-xs rounded px-2 py-1.5 ${e.type === "Warning" ? "bg-yellow-50" : "bg-gray-50"}`}>
+                    <span className={`shrink-0 font-semibold ${e.type === "Warning" ? "text-yellow-700" : "text-blue-600"}`}>{e.reason}</span>
                     <span className="text-gray-600 flex-1 break-words">{e.message}</span>
                     {e.count && e.count > 1 && <span className="shrink-0 text-gray-400">×{e.count}</span>}
                   </div>
@@ -174,15 +142,7 @@ function PodDrawer({
 
 // ── Pod Table ─────────────────────────────────────────────────────────────────
 
-function PodTable({
-  pods,
-  onGoEvents,
-  onSelect,
-}: {
-  pods: ObservePod[];
-  onGoEvents: (pod: string, ns: string) => void;
-  onSelect: (pod: ObservePod) => void;
-}) {
+function PodTable({ pods, onGoEvents, onSelect }: { pods: ObservePod[]; onGoEvents: (pod: string, ns: string) => void; onSelect: (pod: ObservePod) => void }) {
   if (!pods.length) return <p className="text-sm text-gray-400 italic p-4">Pod yok</p>;
   return (
     <table className="w-full text-xs border-collapse">
@@ -200,35 +160,18 @@ function PodTable({
           const allReady      = readyCount === totalCount;
           const totalRestarts = p.containers.reduce((a, c) => a + c.restarts, 0);
           return (
-            <tr
-              key={p.name}
-              className="border-b hover:bg-blue-50 cursor-pointer"
-              onClick={() => onSelect(p)}
-            >
+            <tr key={p.name} className="border-b hover:bg-blue-50 cursor-pointer" onClick={() => onSelect(p)}>
               <td className="px-3 py-1.5 font-mono max-w-[200px] truncate" title={p.name}>{p.name}</td>
               <td className="px-3 py-1.5">
-                <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${
-                  p.phase === "Running" ? "bg-green-100 text-green-700" :
-                  p.phase === "Pending" ? "bg-yellow-100 text-yellow-700" :
-                                          "bg-red-100 text-red-700"
-                }`}>{p.phase}</span>
+                <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${p.phase === "Running" ? "bg-green-100 text-green-700" : p.phase === "Pending" ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"}`}>{p.phase}</span>
               </td>
-              <td className={`px-3 py-1.5 font-mono ${allReady ? "text-green-600" : "text-red-600 font-bold"}`}>
-                {readyCount}/{totalCount}
-              </td>
-              <td className={`px-3 py-1.5 font-mono font-semibold ${
-                totalRestarts === 0 ? "text-gray-300" :
-                totalRestarts >= 10 ? "text-red-600" : "text-orange-600"
-              }`}>
+              <td className={`px-3 py-1.5 font-mono ${allReady ? "text-green-600" : "text-red-600 font-bold"}`}>{readyCount}/{totalCount}</td>
+              <td className={`px-3 py-1.5 font-mono font-semibold ${totalRestarts === 0 ? "text-gray-300" : totalRestarts >= 10 ? "text-red-600" : "text-orange-600"}`}>
                 {totalRestarts > 0 ? `↻ ${totalRestarts}` : "—"}
               </td>
-              <td className="px-3 py-1.5 text-gray-500 max-w-[200px] truncate">
-                {p.containers.map((c) => c.name).join(", ")}
-              </td>
+              <td className="px-3 py-1.5 text-gray-500 max-w-[200px] truncate">{p.containers.map((c) => c.name).join(", ")}</td>
               <td className="px-3 py-1.5 font-mono max-w-[120px] truncate" title={p.node ?? ""}>{p.node || "—"}</td>
-              <td className="px-3 py-1.5 whitespace-nowrap">
-                {p.created_at ? p.created_at.replace("T", " ").replace("Z", "") : "—"}
-              </td>
+              <td className="px-3 py-1.5 whitespace-nowrap">{p.created_at ? p.created_at.replace("T", " ").replace("Z", "") : "—"}</td>
               <td className="px-3 py-1.5" onClick={(e) => { e.stopPropagation(); onGoEvents(p.name, p.namespace); }}>
                 <button className="text-xs px-2 py-0.5 rounded border text-blue-600 hover:bg-blue-50">Events</button>
               </td>
@@ -257,17 +200,13 @@ function EventTable({ events }: { events: ObserveEvent[] }) {
         {events.map((e, i) => (
           <tr key={i} className="border-b hover:bg-gray-50">
             <td className="px-3 py-1.5">
-              <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${
-                e.type === "Warning" ? "bg-yellow-100 text-yellow-700" : "bg-blue-50 text-blue-600"
-              }`}>{e.type}</span>
+              <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${e.type === "Warning" ? "bg-yellow-100 text-yellow-700" : "bg-blue-50 text-blue-600"}`}>{e.type}</span>
             </td>
             <td className="px-3 py-1.5 font-mono">{e.reason}</td>
             <td className="px-3 py-1.5 font-mono max-w-[140px] truncate" title={e.object ?? ""}>{e.object}</td>
             <td className="px-3 py-1.5 max-w-[360px] break-words">{e.message}</td>
             <td className="px-3 py-1.5 text-center">{e.count ?? "—"}</td>
-            <td className="px-3 py-1.5 whitespace-nowrap">
-              {e.last_time ? e.last_time.replace("T", " ").replace("Z", "") : "—"}
-            </td>
+            <td className="px-3 py-1.5 whitespace-nowrap">{e.last_time ? e.last_time.replace("T", " ").replace("Z", "") : "—"}</td>
           </tr>
         ))}
       </tbody>
@@ -286,49 +225,28 @@ function PromQLPanel({ cluster }: { cluster: string }) {
     if (!query.trim()) return;
     setLoading(true);
     try {
-      const r = await runObservePromQL(cluster, query.trim());
-      setResult(r);
-    } finally {
-      setLoading(false);
-    }
+      setResult(await runObservePromQL(cluster, query.trim()));
+    } finally { setLoading(false); }
   };
 
   return (
     <div className="flex flex-col h-full">
       <div className="flex gap-2 px-5 py-3 border-b shrink-0 flex-wrap items-center">
-        <select
-          className="border rounded px-2 py-1.5 text-sm text-gray-600 bg-white"
-          value=""
-          onChange={(e) => { if (e.target.value) setQuery(e.target.value); }}
-        >
+        <select className="border rounded px-2 py-1.5 text-sm text-gray-600 bg-white" value="" onChange={(e) => { if (e.target.value) setQuery(e.target.value); }}>
           <option value="">Hazır sorgular</option>
-          {QUICK_QUERIES.map((q) => (
-            <option key={q.label} value={q.query}>{q.label}</option>
-          ))}
+          {QUICK_QUERIES.map((q) => <option key={q.label} value={q.query}>{q.label}</option>)}
         </select>
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && run()}
+        <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && run()}
           placeholder='ör. kube_pod_status_phase{phase="Failed"}'
-          className="flex-1 min-w-[200px] border rounded px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-300"
-        />
-        <button
-          onClick={run}
-          disabled={loading}
-          className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
-        >
+          className="flex-1 min-w-[200px] border rounded px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-300" />
+        <button onClick={run} disabled={loading} className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50">
           {loading ? "..." : "Çalıştır"}
         </button>
       </div>
-
       <div className="flex-1 min-h-0 overflow-auto">
         {result && (
-          !result.ok ? (
-            <p className="text-red-600 text-sm p-4">{result.error}</p>
-          ) : result.result.length === 0 ? (
-            <p className="text-gray-400 text-sm italic p-4">Sonuç yok</p>
-          ) : (
+          !result.ok ? <p className="text-red-600 text-sm p-4">{result.error}</p> :
+          result.result.length === 0 ? <p className="text-gray-400 text-sm italic p-4">Sonuç yok</p> : (
             <table className="w-full text-xs border-collapse">
               <thead className="sticky top-0 z-10 bg-gray-50">
                 <tr className="text-gray-500 uppercase tracking-wide">
@@ -337,125 +255,15 @@ function PromQLPanel({ cluster }: { cluster: string }) {
                 </tr>
               </thead>
               <tbody>
-                {result.result.map((r, i) => {
-                  const label = Object.entries(r.metric).map(([k, v]) => `${k}="${v}"`).join(", ");
-                  const val   = r.value ? r.value[1] : "—";
-                  return (
-                    <tr key={i} className="border-b hover:bg-gray-50">
-                      <td className="px-3 py-1.5 font-mono text-gray-600 max-w-[500px] break-all">{`{${label}}`}</td>
-                      <td className="px-3 py-1.5 font-semibold">{val}</td>
-                    </tr>
-                  );
-                })}
+                {result.result.map((r, i) => (
+                  <tr key={i} className="border-b hover:bg-gray-50">
+                    <td className="px-3 py-1.5 font-mono text-gray-600 max-w-[500px] break-all">{`{${Object.entries(r.metric).map(([k, v]) => `${k}="${v}"`).join(", ")}}`}</td>
+                    <td className="px-3 py-1.5 font-semibold">{r.value ? r.value[1] : "—"}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Alerts Panel ──────────────────────────────────────────────────────────────
-
-function AlertsPanel({ cluster }: { cluster: string }) {
-  const [result, setResult]   = useState<PromQLResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState("");
-  const [nsFilter, setNsFilter] = useState("");
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const r = await getObserveAlerts(cluster);
-      setResult(r);
-      if (!r.ok) setError(r.error || "Hata");
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [cluster]);
-
-  useEffect(() => { load(); }, [load]);
-
-  const alerts    = result?.result ?? [];
-  const namespaces = Array.from(new Set(alerts.map((a) => a.metric.namespace).filter(Boolean))).sort() as string[];
-  const filtered   = nsFilter ? alerts.filter((a) => a.metric.namespace === nsFilter) : alerts;
-
-  const severityClass = (sev: string) => {
-    if (sev === "critical") return "bg-red-100 text-red-700";
-    if (sev === "warning")  return "bg-yellow-100 text-yellow-700";
-    return "bg-blue-50 text-blue-600";
-  };
-
-  return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center gap-3 px-5 py-3 border-b shrink-0 flex-wrap">
-        {namespaces.length > 0 && (
-          <select
-            value={nsFilter}
-            onChange={(e) => setNsFilter(e.target.value)}
-            className="border rounded px-3 py-1.5 text-sm"
-          >
-            <option value="">— Tüm namespaceler —</option>
-            {namespaces.map((ns) => <option key={ns} value={ns}>{ns}</option>)}
-          </select>
-        )}
-        <button onClick={load} className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50">↻ Yenile</button>
-        {result?.ok && (
-          <span className="text-xs text-gray-400">
-            {filtered.length}{nsFilter ? `/${alerts.length}` : ""} alert
-          </span>
-        )}
-      </div>
-
-      <div className="flex-1 min-h-0 overflow-auto">
-        {loading ? (
-          <p className="text-gray-400 text-sm p-4">Yükleniyor...</p>
-        ) : error ? (
-          <p className="text-red-600 text-sm p-4">{error}</p>
-        ) : filtered.length === 0 ? (
-          <p className="text-green-600 text-sm italic p-4">
-            {alerts.length === 0 ? "Aktif alert yok" : "Bu namespace'te alert yok"}
-          </p>
-        ) : (
-          <table className="w-full text-xs border-collapse">
-            <thead className="sticky top-0 z-10 bg-gray-50">
-              <tr className="text-gray-500 uppercase tracking-wide">
-                {["Alert", "Namespace", "Severity", "Pod / Instance", "Ek Labellar"].map((h) => (
-                  <th key={h} className="px-3 py-2 text-left border-b whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((a, i) => {
-                const m = a.metric;
-                const extraLabels = Object.entries(m)
-                  .filter(([k]) => !["alertname", "alertstate", "namespace", "severity", "pod", "instance", "__name__"].includes(k))
-                  .map(([k, v]) => `${k}="${v}"`)
-                  .join(", ");
-                return (
-                  <tr key={i} className="border-b hover:bg-gray-50">
-                    <td className="px-3 py-1.5 font-mono font-semibold text-gray-800">{m.alertname || "—"}</td>
-                    <td className="px-3 py-1.5 font-mono text-gray-600">{m.namespace || "—"}</td>
-                    <td className="px-3 py-1.5">
-                      {m.severity && (
-                        <span className={`px-1.5 py-0.5 rounded font-semibold ${severityClass(m.severity)}`}>{m.severity}</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-1.5 font-mono text-gray-600 max-w-[180px] truncate" title={m.pod || m.instance}>
-                      {m.pod || m.instance || "—"}
-                    </td>
-                    <td className="px-3 py-1.5 text-gray-400 max-w-[280px] truncate" title={extraLabels}>
-                      {extraLabels || "—"}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
         )}
       </div>
     </div>
@@ -471,18 +279,31 @@ function NoTokenScreen({ hasPromUrl }: { hasPromUrl: boolean }) {
       <h2 className="text-xl font-semibold text-gray-700">Prometheus token bulunamadı</h2>
       {!hasPromUrl && (
         <p className="text-sm text-orange-600 max-w-sm">
-          Ayrıca Prometheus URL tanımlanmamış — <code className="bg-gray-100 px-1 rounded">.env</code> dosyasında{" "}
-          <code className="bg-gray-100 px-1 rounded">PROMETHEUS_URL</code> ayarlayın.
+          Ayrıca Prometheus URL tanımlanmamış —{" "}
+          <code className="bg-gray-100 px-1 rounded">observe.yaml</code> dosyasında cluster yapılandırın.
         </p>
       )}
       <p className="text-sm text-gray-500 max-w-sm">
         <a href="/secrets" className="text-blue-600 hover:underline font-medium">Secrets sayfasına</a> giderek{" "}
         <code className="bg-gray-100 px-1 rounded">prometheus.token</code> dosyasını ekleyin.
-        Token eklendikten sonra bu sayfa otomatik olarak yenilenir.
       </p>
     </div>
   );
 }
+
+// ── Tab config ────────────────────────────────────────────────────────────────
+
+const TAB_LABELS: Record<Tab, string> = {
+  overview:     "Overview",
+  alerts:       "Alertler",
+  nodes:        "Nodes",
+  workload:     "Workload",
+  capacity:     "Kapasite",
+  controlplane: "Kontrol Düzlemi",
+  pods:         "Pods",
+  events:       "Events",
+  promql:       "PromQL",
+};
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -490,7 +311,7 @@ export default function ObservePage() {
   const [auth, setAuth]             = useState<ObserveAuth | null>(null);
   const [clusters, setClusters]     = useState<ObserveCluster[]>([]);
   const [selCluster, setSelCluster] = useState("");
-  const [tab, setTab]               = useState<Tab>("pods");
+  const [tab, setTab]               = useState<Tab>("overview");
 
   const [nsMap, setNsMap]         = useState<Record<string, string[]>>({});
   const [nsLoading, setNsLoading] = useState(false);
@@ -512,10 +333,9 @@ export default function ObservePage() {
 
   const prevAuthRef = useRef<boolean | null>(null);
 
-  // ── Auth polling (5 sn) ──────────────────────────────────────────────────
+  // ── Auth polling (5 sn) ────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
-
     async function checkAuth() {
       try {
         const a = await getObserveAuth();
@@ -528,14 +348,13 @@ export default function ObservePage() {
         setAuth(a);
       } catch { /* observe servisine erişilemiyor */ }
     }
-
     checkAuth();
     const interval = setInterval(checkAuth, 5000);
     return () => { cancelled = true; clearInterval(interval); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Cluster + namespace paralel yükleme ─────────────────────────────────
+  // ── Cluster + namespace yükleme ────────────────────────────────────────────
   const loadClustersAndNamespaces = useCallback(async () => {
     try {
       const cs = await getObserveClusters();
@@ -553,44 +372,33 @@ export default function ObservePage() {
     finally { setNsLoading(false); }
   }, []);
 
-  useEffect(() => {
-    if (auth?.logged_in) loadClustersAndNamespaces();
-  }, [auth?.logged_in, loadClustersAndNamespaces]);
+  useEffect(() => { if (auth?.logged_in) loadClustersAndNamespaces(); }, [auth?.logged_in, loadClustersAndNamespaces]);
+  useEffect(() => { setSelNs(""); setSelNsEv(""); setPods([]); setEvents([]); setNsSummary(null); }, [selCluster]);
 
-  useEffect(() => {
-    setSelNs(""); setSelNsEv(""); setPods([]); setEvents([]); setNsSummary(null);
-  }, [selCluster]);
-
-  // ── Namespace summary ────────────────────────────────────────────────────
+  // ── Namespace summary ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!selCluster || !selNs) { setNsSummary(null); return; }
-    getObserveNamespaceSummary(selCluster, selNs)
-      .then(setNsSummary)
-      .catch(() => setNsSummary(null));
+    getObserveNamespaceSummary(selCluster, selNs).then(setNsSummary).catch(() => setNsSummary(null));
   }, [selCluster, selNs]);
 
-  // ── Pod yükleme ──────────────────────────────────────────────────────────
+  // ── Pod yükleme ────────────────────────────────────────────────────────────
   const loadPods = useCallback(async () => {
     if (!selCluster || !selNs) { setPods([]); return; }
     setPodsLoading(true); setPodsError("");
-    try {
-      setPods(await getObservePods(selCluster, selNs));
-    } catch (e: unknown) {
-      setPodsError(String(e)); setPods([]);
-    } finally { setPodsLoading(false); }
+    try { setPods(await getObservePods(selCluster, selNs)); }
+    catch (e: unknown) { setPodsError(String(e)); setPods([]); }
+    finally { setPodsLoading(false); }
   }, [selCluster, selNs]);
 
   useEffect(() => { loadPods(); }, [loadPods]);
 
-  // ── Event yükleme ────────────────────────────────────────────────────────
+  // ── Event yükleme ──────────────────────────────────────────────────────────
   const loadEvents = useCallback(async () => {
     if (!selCluster || !selNsEv) { setEvents([]); return; }
     setEvLoading(true); setEvError("");
-    try {
-      setEvents(await getObserveEvents(selCluster, selNsEv, selPodEv || undefined));
-    } catch (e: unknown) {
-      setEvError(String(e)); setEvents([]);
-    } finally { setEvLoading(false); }
+    try { setEvents(await getObserveEvents(selCluster, selNsEv, selPodEv || undefined)); }
+    catch (e: unknown) { setEvError(String(e)); setEvents([]); }
+    finally { setEvLoading(false); }
   }, [selCluster, selNsEv, selPodEv]);
 
   useEffect(() => { loadEvents(); }, [loadEvents]);
@@ -610,25 +418,20 @@ export default function ObservePage() {
   if (auth === null) {
     return <div className="flex items-center justify-center py-24 text-gray-400 text-sm">Bağlanıyor...</div>;
   }
-
   if (!auth.logged_in) {
     return <NoTokenScreen hasPromUrl={auth.has_prom_url} />;
   }
 
-  const namespaces    = nsMap[selCluster] ?? [];
+  const namespaces     = nsMap[selCluster] ?? [];
   const currentCluster = clusters.find((c) => c.name === selCluster);
-
-  const TAB_LABELS: Record<Tab, string> = { pods: "Pods", events: "Events", promql: "PromQL", alerts: "Alertler" };
+  const ALL_TABS: Tab[] = ["overview", "alerts", "nodes", "workload", "capacity", "controlplane", "pods", "events", "promql"];
 
   return (
     <>
-      {selectedPod && (
-        <PodDrawer pod={selectedPod} cluster={selCluster} onClose={() => setSelectedPod(null)} />
-      )}
+      {selectedPod && <PodDrawer pod={selectedPod} cluster={selCluster} onClose={() => setSelectedPod(null)} />}
 
       <div className="flex flex-col flex-1 min-h-0 gap-3">
-
-        {/* ── Üst bölüm ─────────────────────────────────────────────────── */}
+        {/* ── Üst bölüm ──────────────────────────────────────────────────── */}
         <div className="shrink-0 space-y-3">
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-bold text-gray-800">Observe</h1>
@@ -638,44 +441,35 @@ export default function ObservePage() {
           {/* Cluster selector */}
           <div className="bg-white border rounded-lg shadow-sm p-4 flex items-center gap-4 flex-wrap">
             <label className="text-sm text-gray-600 font-medium">Cluster</label>
-            <select
-              value={selCluster}
-              onChange={(e) => setSelCluster(e.target.value)}
-              className="border rounded px-3 py-1.5 text-sm w-56"
-            >
+            <select value={selCluster} onChange={(e) => setSelCluster(e.target.value)} className="border rounded px-3 py-1.5 text-sm w-56">
               <option value="">— Seç —</option>
               {clusters.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
             </select>
 
             {currentCluster && (
               <div className="flex gap-2 text-xs">
-                <span className={`px-2 py-0.5 rounded-full font-medium ${
-                  currentCluster.prometheus_available ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"
-                }`}>Prometheus {currentCluster.prometheus_available ? "✓" : "—"}</span>
-                <span className={`px-2 py-0.5 rounded-full font-medium ${
-                  currentCluster.loki_available ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"
-                }`}>Loki {currentCluster.loki_available ? "✓" : "—"}</span>
+                <span className={`px-2 py-0.5 rounded-full font-medium ${currentCluster.prometheus_available ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}>
+                  Prometheus {currentCluster.prometheus_available ? "✓" : "—"}
+                </span>
+                <span className={`px-2 py-0.5 rounded-full font-medium ${currentCluster.loki_available ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}>
+                  Loki {currentCluster.loki_available ? "✓" : "—"}
+                </span>
               </div>
             )}
 
             {nsLoading && <span className="text-xs text-gray-400 animate-pulse">Namespace&apos;ler yükleniyor...</span>}
-
             {selCluster && !nsLoading && (
-              <button
-                onClick={() => refreshNamespaces(selCluster)}
-                className="text-xs px-2 py-1 border rounded hover:bg-gray-50 text-gray-500"
-                title="Namespace listesini yenile"
-              >↻ NS</button>
+              <button onClick={() => refreshNamespaces(selCluster)} className="text-xs px-2 py-1 border rounded hover:bg-gray-50 text-gray-500" title="Namespace listesini yenile">↻ NS</button>
             )}
           </div>
 
-          {/* Tabs */}
-          <div className="flex gap-2">
-            {(["pods", "events", "promql", "alerts"] as Tab[]).map((t) => (
+          {/* Tabs — scrollable on small screens */}
+          <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+            {ALL_TABS.map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors shrink-0 ${
                   tab === t ? "bg-blue-600 text-white" : "bg-white border text-gray-600 hover:bg-gray-50"
                 }`}
               >
@@ -688,63 +482,41 @@ export default function ObservePage() {
         {/* ── Tab content ───────────────────────────────────────────────── */}
         <div className="flex-1 min-h-0 bg-white border rounded-lg shadow-sm flex flex-col overflow-hidden">
 
+          {tab === "overview"     && <PanelOverview     cluster={selCluster} onNavigate={(t) => setTab(t as Tab)} />}
+          {tab === "alerts"       && <PanelAlerts        cluster={selCluster} />}
+          {tab === "nodes"        && <PanelNodes         cluster={selCluster} />}
+          {tab === "workload"     && <PanelWorkload      cluster={selCluster} />}
+          {tab === "capacity"     && <PanelCapacity      cluster={selCluster} />}
+          {tab === "controlplane" && <PanelControlPlane  cluster={selCluster} />}
+          {tab === "promql"       && <PromQLPanel         cluster={selCluster} />}
+
           {/* ── Pods ── */}
           {tab === "pods" && (
             <>
               <div className="px-5 py-3 border-b shrink-0 flex flex-col gap-2">
                 <div className="flex items-center gap-3 flex-wrap">
                   <label className="text-sm text-gray-600 font-medium">Namespace</label>
-                  <select
-                    value={selNs}
-                    onChange={(e) => setSelNs(e.target.value)}
-                    className="border rounded px-3 py-1.5 text-sm w-56"
-                    disabled={!selCluster}
-                  >
+                  <select value={selNs} onChange={(e) => setSelNs(e.target.value)} className="border rounded px-3 py-1.5 text-sm w-56" disabled={!selCluster}>
                     <option value="">— Seç —</option>
                     {namespaces.map((n) => <option key={n} value={n}>{n}</option>)}
                   </select>
-                  {selNs && (
-                    <button onClick={loadPods} className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50">↻</button>
-                  )}
+                  {selNs && <button onClick={loadPods} className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50">↻</button>}
                   {podsError && <span className="text-red-600 text-sm">{podsError}</span>}
                 </div>
-
-                {/* Namespace özet badge'leri */}
                 {selNs && nsSummary && (
                   <div className="flex flex-wrap gap-1.5">
-                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                      Running {nsSummary.running}
-                    </span>
-                    {nsSummary.failed > 0 && (
-                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
-                        Failed {nsSummary.failed}
-                      </span>
-                    )}
-                    {nsSummary.pending > 0 && (
-                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
-                        Pending {nsSummary.pending}
-                      </span>
-                    )}
+                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Running {nsSummary.running}</span>
+                    {nsSummary.failed > 0 && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Failed {nsSummary.failed}</span>}
+                    {nsSummary.pending > 0 && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Pending {nsSummary.pending}</span>}
                     {nsSummary.total_restarts > 0 && (
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        nsSummary.total_restarts >= 10 ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"
-                      }`}>↻ {nsSummary.total_restarts} restart</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${nsSummary.total_restarts >= 10 ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}`}>↻ {nsSummary.total_restarts} restart</span>
                     )}
-                    {nsSummary.warning_events > 0 && (
-                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-                        ⚠ {nsSummary.warning_events} warning event
-                      </span>
-                    )}
+                    {nsSummary.warning_events > 0 && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">⚠ {nsSummary.warning_events} warning event</span>}
                   </div>
                 )}
               </div>
-
               <div className="flex-1 min-h-0 overflow-auto">
-                {podsLoading ? (
-                  <p className="text-gray-400 text-sm p-4">Yükleniyor...</p>
-                ) : (
-                  <PodTable pods={pods} onGoEvents={goToEvents} onSelect={setSelectedPod} />
-                )}
+                {podsLoading ? <p className="text-gray-400 text-sm p-4">Yükleniyor...</p> : <PodTable pods={pods} onGoEvents={goToEvents} onSelect={setSelectedPod} />}
               </div>
             </>
           )}
@@ -755,28 +527,16 @@ export default function ObservePage() {
               <div className="px-5 py-3 border-b shrink-0 flex items-center gap-3 flex-wrap">
                 <div className="flex items-center gap-2">
                   <label className="text-sm text-gray-600 font-medium">Namespace</label>
-                  <select
-                    value={selNsEv}
-                    onChange={(e) => { setSelNsEv(e.target.value); setSelPodEv(""); }}
-                    className="border rounded px-3 py-1.5 text-sm w-48"
-                    disabled={!selCluster}
-                  >
+                  <select value={selNsEv} onChange={(e) => { setSelNsEv(e.target.value); setSelPodEv(""); }} className="border rounded px-3 py-1.5 text-sm w-48" disabled={!selCluster}>
                     <option value="">— Seç —</option>
                     {namespaces.map((n) => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </div>
                 <div className="flex items-center gap-2">
                   <label className="text-sm text-gray-600 font-medium">Pod</label>
-                  <input
-                    value={selPodEv}
-                    onChange={(e) => setSelPodEv(e.target.value)}
-                    placeholder="opsiyonel"
-                    className="border rounded px-3 py-1.5 text-sm font-mono w-48"
-                  />
+                  <input value={selPodEv} onChange={(e) => setSelPodEv(e.target.value)} placeholder="opsiyonel" className="border rounded px-3 py-1.5 text-sm font-mono w-48" />
                 </div>
-                {selNsEv && (
-                  <button onClick={loadEvents} className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50">↻</button>
-                )}
+                {selNsEv && <button onClick={loadEvents} className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50">↻</button>}
                 {evError && <span className="text-red-600 text-sm">{evError}</span>}
               </div>
               <div className="flex-1 min-h-0 overflow-auto">
@@ -784,12 +544,6 @@ export default function ObservePage() {
               </div>
             </>
           )}
-
-          {/* ── PromQL ── */}
-          {tab === "promql" && <PromQLPanel cluster={selCluster} />}
-
-          {/* ── Alerts ── */}
-          {tab === "alerts" && <AlertsPanel cluster={selCluster} />}
         </div>
       </div>
     </>

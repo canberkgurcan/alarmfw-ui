@@ -205,6 +205,96 @@ export const getObservePodMetrics = (pod: string, namespace: string, cluster = "
   return obsReq<{ cpu: PromQLResult; memory: PromQLResult }>(`/api/observe/pod-metrics?${q.toString()}`);
 };
 
+// ── Health / Overview endpoints ───────────────────────────────────────────────
+
+export const getHealthOverview = (cluster = "") =>
+  obsReq<HealthOverview>(`/api/observe/health/overview?cluster=${encodeURIComponent(cluster)}`);
+
+export const getHealthAlerts = (cluster = "") =>
+  obsReq<HealthAlertsResult>(`/api/observe/health/alerts?cluster=${encodeURIComponent(cluster)}`);
+
+export const getHealthNodes = (cluster = "") =>
+  obsReq<HealthNodes>(`/api/observe/health/nodes?cluster=${encodeURIComponent(cluster)}`);
+
+export const getHealthWorkload = (cluster = "") =>
+  obsReq<HealthWorkload>(`/api/observe/health/workload?cluster=${encodeURIComponent(cluster)}`);
+
+export const getHealthCapacity = (cluster = "") =>
+  obsReq<HealthCapacity>(`/api/observe/health/capacity?cluster=${encodeURIComponent(cluster)}`);
+
+export const getHealthControlPlane = (cluster = "") =>
+  obsReq<HealthControlPlane>(`/api/observe/health/controlplane?cluster=${encodeURIComponent(cluster)}`);
+
+// ── Health types ──────────────────────────────────────────────────────────────
+
+export interface HealthOverview {
+  ok: boolean;
+  cluster: string;
+  firing_alerts: number;
+  crashloop: number;
+  oomkilled: number;
+  imagepull: number;
+  pending_pods: number;
+  notready_nodes: number;
+  unavailable_deployments: number;
+  failed_jobs: number;
+}
+
+export interface HealthAlert {
+  metric: Record<string, string>;
+  value?: [number, string];
+  active_secs: number | null;
+}
+
+export interface HealthAlertsResult {
+  ok: boolean;
+  error?: string;
+  result: HealthAlert[];
+}
+
+export interface HealthNodes {
+  ok: boolean;
+  notready: PromMetric[];
+  pressure: PromMetric[];
+  cpu: PromMetric[];
+  memory: PromMetric[];
+  disk: PromMetric[];
+}
+
+export interface HealthWorkload {
+  ok: boolean;
+  crashloop: PromMetric[];
+  oomkilled: PromMetric[];
+  imagepull: PromMetric[];
+  pending: PromMetric[];
+  unavailable: PromMetric[];
+  failed_jobs: PromMetric[];
+}
+
+export interface HealthCapacity {
+  ok: boolean;
+  cpu_ratio: PromMetric[];
+  cpu_abs: PromMetric[];
+  quota_used: PromMetric[];
+  quota_hard: PromMetric[];
+  pvc_ratio: PromMetric[];
+}
+
+export interface HealthControlPlane {
+  ok: boolean;
+  etcd_db_size: PromMetric[];
+  etcd_has_leader: PromMetric[];
+  etcd_leader_changes: PromMetric[];
+  apiserver_5xx_rate: PromMetric[];
+  apiserver_p99: PromMetric[];
+  cert_expiry_7d: PromMetric[];
+}
+
+export interface PromMetric {
+  metric: Record<string, string>;
+  value?: [number, string];
+}
+
 export interface NamespaceSummary {
   running: number;
   failed: number;
