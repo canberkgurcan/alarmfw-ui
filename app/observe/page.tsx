@@ -65,7 +65,7 @@ function PodDrawer({
 
   useEffect(() => {
     setMetricsLoading(true);
-    getObservePodMetrics(pod.name, pod.namespace)
+    getObservePodMetrics(pod.name, pod.namespace, cluster)
       .then(setMetrics)
       .catch(() => {})
       .finally(() => setMetricsLoading(false));
@@ -358,7 +358,7 @@ function PromQLPanel({ cluster }: { cluster: string }) {
 
 // ── Alerts Panel ──────────────────────────────────────────────────────────────
 
-function AlertsPanel() {
+function AlertsPanel({ cluster }: { cluster: string }) {
   const [result, setResult]   = useState<PromQLResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
@@ -368,7 +368,7 @@ function AlertsPanel() {
     setLoading(true);
     setError("");
     try {
-      const r = await getObserveAlerts();
+      const r = await getObserveAlerts(cluster);
       setResult(r);
       if (!r.ok) setError(r.error || "Hata");
     } catch (e) {
@@ -376,12 +376,12 @@ function AlertsPanel() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [cluster]);
 
   useEffect(() => { load(); }, [load]);
 
   const alerts    = result?.result ?? [];
-  const namespaces = [...new Set(alerts.map((a) => a.metric.namespace).filter(Boolean))].sort() as string[];
+  const namespaces = Array.from(new Set(alerts.map((a) => a.metric.namespace).filter(Boolean))).sort() as string[];
   const filtered   = nsFilter ? alerts.filter((a) => a.metric.namespace === nsFilter) : alerts;
 
   const severityClass = (sev: string) => {
@@ -789,7 +789,7 @@ export default function ObservePage() {
           {tab === "promql" && <PromQLPanel cluster={selCluster} />}
 
           {/* ── Alerts ── */}
-          {tab === "alerts" && <AlertsPanel />}
+          {tab === "alerts" && <AlertsPanel cluster={selCluster} />}
         </div>
       </div>
     </>
