@@ -63,14 +63,21 @@ export default function SecretsPage() {
 
   async function save() {
     const name = cluster.trim();
-    if (!name || !ocpApi.trim() || !ocpToken.trim()) {
-      setMsg("Cluster adı, OCP API URL ve OCP Token zorunludur");
+    if (!name || !ocpApi.trim()) {
+      setMsg("Cluster adı ve OCP API URL zorunludur");
+      return;
+    }
+    const isNew = !allClusters.includes(name);
+    if (isNew && !ocpToken.trim()) {
+      setMsg("Yeni cluster için OCP Token zorunludur");
       return;
     }
     setSaving(true);
     setMsg("");
     try {
-      await uploadSecretText(name, ocpToken.trim());
+      if (ocpToken.trim()) {
+        await uploadSecretText(name, ocpToken.trim());
+      }
       if (promToken.trim()) {
         await uploadSecretText(`${name}-prometheus`, promToken.trim());
       }
@@ -216,10 +223,11 @@ export default function SecretsPage() {
           </label>
           <label className="block text-sm md:col-span-2">
             <span className="text-gray-600 font-medium">
-              OCP Token <span className="text-red-500">*</span>
+              OCP Token{!allClusters.includes(cluster.trim()) && <span className="text-red-500"> *</span>}
             </span>
             <textarea value={ocpToken} onChange={(e) => setOcpToken(e.target.value)}
-              rows={3} placeholder="eyJhbGci..."
+              rows={3}
+              placeholder={allClusters.includes(cluster.trim()) ? "Boş bırakılırsa mevcut token değişmez" : "eyJhbGci..."}
               className="mt-1 block w-full border rounded px-3 py-2 text-sm font-mono resize-none" />
           </label>
           <label className="block text-sm">
