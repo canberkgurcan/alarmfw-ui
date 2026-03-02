@@ -75,6 +75,13 @@ export const deleteCluster = (name: string) =>
 export const generateConfig = () =>
   req<{ ok: boolean; generated_checks: number }>("/api/config/generate", { method: "POST" });
 
+export const getObserveClusterConfigs = () =>
+  req<ObserveClusterConfig[]>("/api/config/observe-clusters");
+export const upsertObserveCluster = (name: string, body: ObserveClusterConfig) =>
+  req<{ ok: boolean }>(`/api/config/observe-clusters/${name}`, { method: "PUT", body: JSON.stringify(body) });
+export const deleteObserveCluster = (name: string) =>
+  req<{ ok: boolean }>(`/api/config/observe-clusters/${name}`, { method: "DELETE" });
+
 // ── Types ─────────────────────────────────────────────
 export type Status = "OK" | "PROBLEM" | "ERROR";
 
@@ -143,6 +150,14 @@ export interface Cluster {
   ocp_api: string;
   insecure: boolean;
   has_token_file?: boolean;
+}
+
+export interface ObserveClusterConfig {
+  name: string;
+  ocp_api: string;
+  insecure?: boolean;
+  prometheus_url: string;
+  prometheus_token_file?: string;
 }
 
 // ── Observe ───────────────────────────────────────────
