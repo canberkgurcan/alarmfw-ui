@@ -284,9 +284,14 @@ function NoTokenScreen({ hasPromUrl }: { hasPromUrl: boolean }) {
         </p>
       )}
       <p className="text-sm text-gray-500 max-w-sm">
-        <a href="/secrets" className="text-blue-600 hover:underline font-medium">Secrets sayfasına</a> giderek{" "}
-        <code className="bg-gray-100 px-1 rounded">prometheus.token</code> dosyasını ekleyin.
+        <a href="/secrets" className="text-blue-600 hover:underline font-medium">Secrets sayfasına</a> giderek
+        cluster için token ekleyin:
       </p>
+      <div className="text-xs text-gray-400 space-y-0.5 text-left">
+        <div><code className="bg-gray-100 px-1 rounded">prometheus.token</code> — global Prometheus</div>
+        <div><code className="bg-gray-100 px-1 rounded">&lt;cluster&gt;-prometheus.token</code> — per-cluster Prometheus</div>
+        <div><code className="bg-gray-100 px-1 rounded">&lt;cluster&gt;.token</code> — OCP API</div>
+      </div>
     </div>
   );
 }
