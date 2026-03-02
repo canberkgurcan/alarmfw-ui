@@ -81,7 +81,7 @@ export default function PanelOverview({
         {loading && <span className="text-xs text-gray-400 animate-pulse">Yenileniyor...</span>}
         {lastAt && !loading && (
           <span className="text-xs text-gray-400">
-            {lastAt.toLocaleTimeString("tr-TR")} · 30 sn aralıkla güncellenir
+            {lastAt.toLocaleTimeString("tr-TR", { timeZone: "Europe/Istanbul" })} · 30 sn aralıkla güncellenir
           </span>
         )}
         <button

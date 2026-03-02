@@ -53,6 +53,20 @@ function fmtMem(val: string): string {
   return `${(v / 1024).toFixed(0)} KiB`;
 }
 
+/** ISO 8601 UTC string'i Istanbul (GMT+3) olarak formatlar */
+function fmtIsoTime(isoStr: string | null | undefined): string {
+  if (!isoStr) return "—";
+  try {
+    return new Date(isoStr).toLocaleString("tr-TR", {
+      timeZone: "Europe/Istanbul",
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit",
+    });
+  } catch {
+    return isoStr;
+  }
+}
+
 // ── Pod Drawer ─────────────────────────────────────────────────────────────────
 
 function PodDrawer({ pod, cluster, onClose }: { pod: ObservePod; cluster: string; onClose: () => void }) {
@@ -95,7 +109,7 @@ function PodDrawer({ pod, cluster, onClose }: { pod: ObservePod; cluster: string
               <span className={`px-2 py-1 rounded-full font-semibold ${totalRestarts >= 10 ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}`}>↻ {totalRestarts} restart</span>
             )}
             {pod.created_at && (
-              <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-500">{pod.created_at.replace("T", " ").replace("Z", "")}</span>
+              <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-500">{fmtIsoTime(pod.created_at)}</span>
             )}
           </div>
           <div>
@@ -171,7 +185,7 @@ function PodTable({ pods, onGoEvents, onSelect }: { pods: ObservePod[]; onGoEven
               </td>
               <td className="px-3 py-1.5 text-gray-500 max-w-[200px] truncate">{p.containers.map((c) => c.name).join(", ")}</td>
               <td className="px-3 py-1.5 font-mono max-w-[120px] truncate" title={p.node ?? ""}>{p.node || "—"}</td>
-              <td className="px-3 py-1.5 whitespace-nowrap">{p.created_at ? p.created_at.replace("T", " ").replace("Z", "") : "—"}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap">{fmtIsoTime(p.created_at)}</td>
               <td className="px-3 py-1.5" onClick={(e) => { e.stopPropagation(); onGoEvents(p.name, p.namespace); }}>
                 <button className="text-xs px-2 py-0.5 rounded border text-blue-600 hover:bg-blue-50">Events</button>
               </td>
@@ -206,7 +220,7 @@ function EventTable({ events }: { events: ObserveEvent[] }) {
             <td className="px-3 py-1.5 font-mono max-w-[140px] truncate" title={e.object ?? ""}>{e.object}</td>
             <td className="px-3 py-1.5 max-w-[360px] break-words">{e.message}</td>
             <td className="px-3 py-1.5 text-center">{e.count ?? "—"}</td>
-            <td className="px-3 py-1.5 whitespace-nowrap">{e.last_time ? e.last_time.replace("T", " ").replace("Z", "") : "—"}</td>
+            <td className="px-3 py-1.5 whitespace-nowrap">{fmtIsoTime(e.last_time)}</td>
           </tr>
         ))}
       </tbody>
