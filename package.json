@@ -4,8 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev --port 3000",
-    "build": "next build",
-    "start": "next start --port 3000"
+    "build": "node -r ./scripts/fs-rename-exdev-fallback.cjs ./node_modules/next/dist/bin/next build",
+    "start": "next start --port 3000",
+    "test": "~/.nvm/versions/node/v20.20.0/bin/node ./node_modules/.bin/vitest run",
+    "test:watch": "~/.nvm/versions/node/v20.20.0/bin/node ./node_modules/.bin/vitest"
   },
   "dependencies": {
     "next": "15.3.9",
@@ -13,12 +15,17 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "typescript": "^5",
-    "tailwindcss": "^3.4.1",
+    "@vitejs/plugin-react": "^5.1.4",
+    "autoprefixer": "^10",
+    "jsdom": "^28.1.0",
     "postcss": "^8",
-    "autoprefixer": "^10"
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5",
+    "vitest": "^4.0.18"
   }
 }
