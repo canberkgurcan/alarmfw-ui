@@ -2,13 +2,11 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Build-time: tarayıcıda kullanılacak API adresleri (Jenkinsfile'da --build-arg ile override edilir)
+# Build-time env (artık NEXT_PUBLIC_ALARMFW_API_KEY yok — proxy mimarisi ile gizli tutulur)
 ARG NEXT_PUBLIC_API_URL=http://localhost:8000
 ARG NEXT_PUBLIC_OBSERVE_URL=http://localhost:8001
-ARG NEXT_PUBLIC_ALARMFW_API_KEY=
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV NEXT_PUBLIC_OBSERVE_URL=${NEXT_PUBLIC_OBSERVE_URL}
-ENV NEXT_PUBLIC_ALARMFW_API_KEY=${NEXT_PUBLIC_ALARMFW_API_KEY}
 
 COPY package.json ./
 RUN --mount=type=cache,target=/root/.npm \
