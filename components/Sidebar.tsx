@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { signOut } from "next-auth/react";
 
 const TOP_NAV = [
   { href: "/dashboard", label: "Dashboard", icon: "◈" },
@@ -18,7 +19,18 @@ const MANAGE_NAV = [
   { href: "/admin-console",  label: "Admin Console",  icon: "⌨" },
 ];
 
-export default function Sidebar() {
+const ROLE_BADGE: Record<string, string> = {
+  admin:    "bg-blue-600/30 text-blue-300",
+  operator: "bg-yellow-600/30 text-yellow-300",
+  readonly: "bg-gray-600/30 text-gray-300",
+};
+
+interface SidebarProps {
+  username: string;
+  role: "admin" | "operator" | "readonly";
+}
+
+export default function Sidebar({ username, role }: SidebarProps) {
   const path = usePathname();
   const manageActive = MANAGE_NAV.some((n) => path.startsWith(n.href));
   const [manageOpen, setManageOpen] = useState(manageActive);
@@ -74,8 +86,21 @@ export default function Sidebar() {
           </div>
         )}
       </nav>
-      <div className="px-5 py-4 border-t border-white/10">
-        <p className="text-white/25 text-xs">v0.1.0</p>
+
+      {/* Footer: user info + logout */}
+      <div className="px-5 py-4 border-t border-white/10 space-y-2">
+        <div className="flex items-center gap-2">
+          <span className="text-white/70 text-xs font-medium truncate">{username}</span>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${ROLE_BADGE[role] ?? ROLE_BADGE.readonly}`}>
+            {role}
+          </span>
+        </div>
+        <button
+          onClick={() => signOut({ callbackUrl: "/login" })}
+          className="w-full text-left text-white/30 hover:text-white/60 text-xs transition-colors"
+        >
+          Çıkış yap
+        </button>
       </div>
     </aside>
   );

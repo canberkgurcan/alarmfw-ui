@@ -3,12 +3,12 @@
 const BASE =
   typeof window === "undefined"
     ? (process.env.API_URL ?? "http://alarmfw-api:8000")
-    : (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000");
+    : "/api/proxy"; // client-side: Next.js proxy (session'dan API key ekler)
 
 const OBSERVE_BASE =
   typeof window === "undefined"
     ? (process.env.OBSERVE_URL ?? "http://alarmfw-observe:8001")
-    : (process.env.NEXT_PUBLIC_OBSERVE_URL ?? "http://localhost:8001");
+    : "/api/obs-proxy"; // client-side: Next.js observe proxy
 
 const API_KEY =
   typeof window === "undefined"
