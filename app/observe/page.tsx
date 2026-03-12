@@ -359,32 +359,50 @@ function PromQLPanel({ cluster }: { cluster: string }) {
       <div className="flex-1 min-h-0 overflow-auto">
         {result && (
           !result.ok ? <p className="text-red-600 text-sm p-4">{result.error}</p> :
-          result.result.length === 0 ? <p className="text-gray-400 text-sm italic p-4">Sonuç yok</p> : (
-            <table className="w-full text-xs border-collapse">
-              <thead className="sticky top-0 z-10 bg-gray-50">
-                <tr className="text-gray-500 uppercase tracking-wide">
-                  <th className="px-3 py-2 text-left border-b">Kaynak</th>
-                  <th className="px-3 py-2 text-left border-b">
-                    Değer ({matchedQuery?.unitLabel ?? "ham"})
-                  </th>
-                  <th className="px-3 py-2 text-left border-b">Ham Değer</th>
-                  <th className="px-3 py-2 text-left border-b">Etiketler</th>
-                </tr>
-              </thead>
-              <tbody>
-                {result.result.map((r, i) => (
-                  <tr key={i} className="border-b hover:bg-gray-50">
-                    <td className="px-3 py-1.5 text-gray-700 max-w-[380px] break-words">{summarizeMetric(r.metric)}</td>
-                    <td className="px-3 py-1.5 font-semibold whitespace-nowrap">
-                      {fmtPromValue(r.value?.[1], matchedQuery?.valueKind ?? "raw")}
-                    </td>
-                    <td className="px-3 py-1.5 font-mono text-gray-500 whitespace-nowrap">{r.value ? r.value[1] : "—"}</td>
-                    <td className="px-3 py-1.5 font-mono text-gray-600 max-w-[560px] break-all">{metricAsLabelText(r.metric)}</td>
+          result.result.length === 0 ? <p className="text-gray-400 text-sm italic p-4">Sonuç yok</p> : (() => {
+            // hangi kolonların dolu olduğunu tespit et
+            const hasNs        = result.result.some((r) => r.metric.namespace);
+            const hasPod       = result.result.some((r) => r.metric.pod);
+            const hasContainer = result.result.some((r) => r.metric.container);
+            const hasNode      = result.result.some((r) => r.metric.node);
+            const hasAlert     = result.result.some((r) => r.metric.alertname);
+            const hasSeverity  = result.result.some((r) => r.metric.severity);
+            const hasInstance  = result.result.some((r) => r.metric.instance);
+            return (
+              <table className="w-full text-xs border-collapse">
+                <thead className="sticky top-0 z-10 bg-gray-50">
+                  <tr className="text-gray-500 uppercase tracking-wide">
+                    {hasNs        && <th className="px-3 py-2 text-left border-b whitespace-nowrap">Namespace</th>}
+                    {hasPod       && <th className="px-3 py-2 text-left border-b whitespace-nowrap">Pod</th>}
+                    {hasContainer && <th className="px-3 py-2 text-left border-b whitespace-nowrap">Container</th>}
+                    {hasNode      && <th className="px-3 py-2 text-left border-b whitespace-nowrap">Node</th>}
+                    {hasAlert     && <th className="px-3 py-2 text-left border-b whitespace-nowrap">Alert</th>}
+                    {hasSeverity  && <th className="px-3 py-2 text-left border-b whitespace-nowrap">Severity</th>}
+                    {hasInstance  && <th className="px-3 py-2 text-left border-b whitespace-nowrap">Instance</th>}
+                    <th className="px-3 py-2 text-left border-b whitespace-nowrap">
+                      Değer {matchedQuery ? `(${matchedQuery.unitLabel})` : ""}
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )
+                </thead>
+                <tbody>
+                  {result.result.map((r, i) => (
+                    <tr key={i} className="border-b hover:bg-gray-50">
+                      {hasNs        && <td className="px-3 py-1.5 font-mono text-gray-600 max-w-[160px] truncate" title={r.metric.namespace}>{r.metric.namespace || "—"}</td>}
+                      {hasPod       && <td className="px-3 py-1.5 font-mono text-gray-800 max-w-[220px] truncate" title={r.metric.pod}>{r.metric.pod || "—"}</td>}
+                      {hasContainer && <td className="px-3 py-1.5 font-mono text-gray-600 max-w-[140px] truncate" title={r.metric.container}>{r.metric.container || "—"}</td>}
+                      {hasNode      && <td className="px-3 py-1.5 font-mono text-gray-600 max-w-[160px] truncate" title={r.metric.node}>{r.metric.node || "—"}</td>}
+                      {hasAlert     && <td className="px-3 py-1.5 font-semibold text-orange-700 max-w-[160px] truncate" title={r.metric.alertname}>{r.metric.alertname || "—"}</td>}
+                      {hasSeverity  && <td className="px-3 py-1.5"><span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${r.metric.severity === "critical" ? "bg-red-100 text-red-700" : r.metric.severity === "warning" ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-600"}`}>{r.metric.severity || "—"}</span></td>}
+                      {hasInstance  && <td className="px-3 py-1.5 font-mono text-gray-500 max-w-[160px] truncate" title={r.metric.instance}>{r.metric.instance || "—"}</td>}
+                      <td className="px-3 py-1.5 font-semibold whitespace-nowrap">
+                        {fmtPromValue(r.value?.[1], matchedQuery?.valueKind ?? "raw")}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            );
+          })()
         )}
       </div>
     </div>
