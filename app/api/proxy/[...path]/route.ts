@@ -3,6 +3,15 @@ import { NextRequest } from "next/server";
 
 const UPSTREAM = process.env.API_URL ?? "http://alarmfw-api:8000";
 
+function resolveApiKey(role: string): string {
+  const map: Record<string, string> = {
+    admin:    ((process.env.ALARMFW_API_KEY_ADMIN    ?? "").trim() || (process.env.ALARMFW_API_KEY ?? "").trim()),
+    operator: (process.env.ALARMFW_API_KEY_OPERATOR  ?? "").trim(),
+    readonly: (process.env.ALARMFW_API_KEY_READONLY  ?? "").trim(),
+  };
+  return map[role] ?? "";
+}
+
 async function handler(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const session = await auth();
   if (!session) return new Response("Unauthorized", { status: 401 });
@@ -18,7 +27,7 @@ async function handler(req: NextRequest, { params }: { params: Promise<{ path: s
     const val = req.headers.get(name);
     if (val) headers.set(name, val);
   }
-  headers.set("X-API-Key", session.user.apiKey ?? "");
+  headers.set("X-API-Key", resolveApiKey(session.user.role));
   headers.set("X-Actor", session.user.name ?? "");
 
   const hasBody = req.method !== "GET" && req.method !== "HEAD";

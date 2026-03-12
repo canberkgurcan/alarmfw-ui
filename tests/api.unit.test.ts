@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 type MockResponseOpts = {
   ok?: boolean;
@@ -25,18 +25,12 @@ async function importApi() {
   return import("@/lib/api");
 }
 
-beforeEach(() => {
-  process.env.NEXT_PUBLIC_API_URL = "http://api.local";
-  process.env.NEXT_PUBLIC_OBSERVE_URL = "http://observe.local";
-  process.env.NEXT_PUBLIC_ALARMFW_API_KEY = "unit-test-key";
-});
-
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
 describe("lib/api unit", () => {
-  it("sends API requests with X-API-Key header", async () => {
+  it("routes API requests through the proxy path", async () => {
     const fetchMock = vi.fn().mockResolvedValue(mockResponse({ jsonBody: [] }));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -44,14 +38,11 @@ describe("lib/api unit", () => {
     await api.getSecrets();
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://api.local/api/secrets");
-    const headers = init.headers as Headers;
-    expect(headers.get("Content-Type")).toBe("application/json");
-    expect(headers.get("X-API-Key")).toBe("unit-test-key");
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/proxy/api/secrets");
   });
 
-  it("sends Observe requests to observe base URL with auth header", async () => {
+  it("routes Observe requests through the obs-proxy path", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       mockResponse({ jsonBody: { logged_in: false, has_token: false, has_prom_url: false } })
     );
@@ -61,10 +52,8 @@ describe("lib/api unit", () => {
     await api.getObserveAuth();
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://observe.local/api/observe/auth");
-    const headers = init.headers as Headers;
-    expect(headers.get("X-API-Key")).toBe("unit-test-key");
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/obs-proxy/api/observe/auth");
   });
 
   it("encodes query parameters for getObserveEvents", async () => {
@@ -75,8 +64,8 @@ describe("lib/api unit", () => {
     await api.getObserveEvents("cl us", "web/store", "pod 1", "Warning");
 
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    const u = new URL(url);
-    expect(`${u.origin}${u.pathname}`).toBe("http://observe.local/api/observe/events");
+    const u = new URL(url, "http://localhost");
+    expect(u.pathname).toBe("/api/obs-proxy/api/observe/events");
     expect(u.searchParams.get("cluster")).toBe("cl us");
     expect(u.searchParams.get("namespace")).toBe("web/store");
     expect(u.searchParams.get("pod")).toBe("pod 1");
@@ -103,7 +92,7 @@ describe("lib/api unit", () => {
     await api.getMaintenancePolicy();
 
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://api.local/api/policies/maintenance");
+    expect(url).toBe("/api/proxy/api/policies/maintenance");
   });
 
   it("calls alarm metrics endpoint on getAlarmMetrics", async () => {
@@ -116,7 +105,7 @@ describe("lib/api unit", () => {
     await api.getAlarmMetrics();
 
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://api.local/api/alarms/metrics");
+    expect(url).toBe("/api/proxy/api/alarms/metrics");
   });
 
   it("sends POST to create maintenance silence", async () => {
@@ -131,7 +120,7 @@ describe("lib/api unit", () => {
     });
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://api.local/api/policies/maintenance/silences");
+    expect(url).toBe("/api/proxy/api/policies/maintenance/silences");
     expect(init.method).toBe("POST");
   });
 
@@ -152,7 +141,7 @@ describe("lib/api unit", () => {
     );
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://api.local/api/policies/maintenance/silences/dry-run");
+    expect(url).toBe("/api/proxy/api/policies/maintenance/silences/dry-run");
     expect(init.method).toBe("POST");
   });
 
@@ -164,7 +153,7 @@ describe("lib/api unit", () => {
     await api.getPolicyAudit("maintenance", 25);
 
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://api.local/api/policies/audit?policy=maintenance&limit=25");
+    expect(url).toBe("/api/proxy/api/policies/audit?policy=maintenance&limit=25");
   });
 
   it("calls policy versions endpoint with encoded query", async () => {
@@ -177,7 +166,7 @@ describe("lib/api unit", () => {
     await api.getPolicyVersions("maintenance", 10);
 
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://api.local/api/policies/versions?policy=maintenance&limit=10");
+    expect(url).toBe("/api/proxy/api/policies/versions?policy=maintenance&limit=10");
   });
 
   it("sends POST to policy rollback endpoint", async () => {
@@ -190,9 +179,9 @@ describe("lib/api unit", () => {
     await api.rollbackPolicyVersion("maintenance", "v-1");
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://api.local/api/policies/rollback");
+    expect(url).toBe("/api/proxy/api/policies/rollback");
     expect(init.method).toBe("POST");
-    expect(init.body).toBe('{\"policy\":\"maintenance\",\"version_id\":\"v-1\"}');
+    expect(init.body).toBe('{"policy":"maintenance","version_id":"v-1"}');
   });
 
   it("throws detailed error text for non-ok responses", async () => {
