@@ -42,6 +42,7 @@ export const getAlarms = (limit = 50, status?: string) =>
   req<Alarm[]>(`/api/alarms?limit=${limit}${status ? `&status=${status}` : ""}`);
 
 export const getAlarmState = () => req<AlarmState[]>("/api/alarms/state");
+export const getAlarmMetrics = () => req<AlarmRuntimeMetrics>("/api/alarms/metrics");
 
 // ── Checks ────────────────────────────────────────────
 export const getChecks = () => req<Check[]>("/api/checks");
@@ -96,13 +97,13 @@ export const getMaintenancePolicy = () =>
   req<MaintenancePolicy>("/api/policies/maintenance");
 
 export const updateMaintenancePolicy = (body: MaintenancePolicy) =>
-  req<{ ok: boolean; silences: number }>("/api/policies/maintenance", {
+  req<{ ok: boolean; silences: number; overlaps?: number; version_id?: string }>("/api/policies/maintenance", {
     method: "PUT",
     body: JSON.stringify(body),
   });
 
 export const createMaintenanceSilence = (body: MaintenanceSilence) =>
-  req<{ ok: boolean; id: string }>("/api/policies/maintenance/silences", {
+  req<{ ok: boolean; id: string; version_id?: string }>("/api/policies/maintenance/silences", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -118,8 +119,19 @@ export const getPolicyAudit = (policy = "maintenance", limit = 50) =>
     `/api/policies/audit?policy=${encodeURIComponent(policy)}&limit=${encodeURIComponent(String(limit))}`
   );
 
+export const getPolicyVersions = (policy = "maintenance", limit = 25) =>
+  req<PolicyVersionList>(
+    `/api/policies/versions?policy=${encodeURIComponent(policy)}&limit=${encodeURIComponent(String(limit))}`
+  );
+
+export const rollbackPolicyVersion = (policy: "maintenance" | "dedup", versionId: string) =>
+  req<PolicyRollbackResult>("/api/policies/rollback", {
+    method: "POST",
+    body: JSON.stringify({ policy, version_id: versionId }),
+  });
+
 export const deleteMaintenanceSilence = (id: string) =>
-  req<{ ok: boolean; id: string }>(`/api/policies/maintenance/silences/${encodeURIComponent(id)}`, {
+  req<{ ok: boolean; id: string; version_id?: string }>(`/api/policies/maintenance/silences/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
 
@@ -143,6 +155,19 @@ export interface AlarmState {
   last_sent_ts: number | null;
   last_change_ts: number | null;
   alarm_name?: string | null;
+}
+
+export interface AlarmRuntimeMetrics {
+  version: number;
+  updated_at_utc: string;
+  rules_evaluated_total: number;
+  notifications_sent_total: number;
+  notifications_suppressed_total: number;
+  evaluation_count_total: number;
+  evaluation_latency_ms_last: number;
+  evaluation_latency_ms_sum: number;
+  evaluation_latency_ms_avg: number;
+  last_exit_code: number;
 }
 
 export interface Check {
@@ -250,6 +275,29 @@ export interface PolicyAuditEntry {
 export interface PolicyAuditList {
   entries: PolicyAuditEntry[];
   count: number;
+}
+
+export interface PolicyVersionEntry {
+  id: string;
+  policy: string;
+  created_at_utc: string;
+  source_action: string;
+  actor: string;
+  meta?: Record<string, unknown>;
+  details?: Record<string, unknown>;
+}
+
+export interface PolicyVersionList {
+  policy: string;
+  entries: PolicyVersionEntry[];
+  count: number;
+}
+
+export interface PolicyRollbackResult {
+  ok: boolean;
+  policy: string;
+  rolled_back_from: string;
+  version_id: string;
 }
 
 // ── Observe ───────────────────────────────────────────

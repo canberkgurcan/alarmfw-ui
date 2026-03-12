@@ -111,6 +111,7 @@ describe("API module", () => {
       // Alarms
       "getAlarms",
       "getAlarmState",
+      "getAlarmMetrics",
       // Checks
       "getChecks",
       "updateCheck",
@@ -159,6 +160,15 @@ describe("API module", () => {
       "getMonitorPods",
       "getMonitorNamespaces",
       "getMonitorClusters",
+      // Policies / Maintenance
+      "getMaintenancePolicy",
+      "updateMaintenancePolicy",
+      "createMaintenanceSilence",
+      "dryRunMaintenanceSilence",
+      "deleteMaintenanceSilence",
+      "getPolicyAudit",
+      "getPolicyVersions",
+      "rollbackPolicyVersion",
       // Admin
       "getZabbixNamespaces",
       "sendZabbixEvent",
