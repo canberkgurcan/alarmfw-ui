@@ -6,7 +6,7 @@ AlarmFW yönetim arayüzü. Next.js 15, port 3000.
 
 | Sayfa | Açıklama |
 |---|---|
-| `/dashboard` | Alarm özeti ve durum |
+| `/dashboard` | Alarm özeti, durum ve pipeline health metrikleri |
 | `/monitor` | Pod snapshot izleme |
 | `/observe` | Prometheus metrikleri, alerts, pod detay |
 | `/checks` | Check YAML yönetimi |
@@ -30,6 +30,7 @@ AlarmFW yönetim arayüzü. Next.js 15, port 3000.
 | `ALARMFW_ACTOR` | Runtime | Server-side çağrılar için opsiyonel audit aktörü |
 
 > `NEXT_PUBLIC_*` değişkenleri image build sırasında baked-in olur. Docker Compose'da `localhost` kullanılır, OCP'de Jenkinsfile `--build-arg` ile dış route URL'lerini geçer.
+> Verilen `ALARMFW_API_KEY` hangi role aitse (read-only/operator/admin), UI o rol yetkileriyle çalışır.
 
 ## Geliştirme
 

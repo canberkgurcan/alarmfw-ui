@@ -106,6 +106,19 @@ describe("lib/api unit", () => {
     expect(url).toBe("http://api.local/api/policies/maintenance");
   });
 
+  it("calls alarm metrics endpoint on getAlarmMetrics", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mockResponse({ jsonBody: { rules_evaluated_total: 0, notifications_sent_total: 0 } })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const api = await importApi();
+    await api.getAlarmMetrics();
+
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://api.local/api/alarms/metrics");
+  });
+
   it("sends POST to create maintenance silence", async () => {
     const fetchMock = vi.fn().mockResolvedValue(mockResponse({ jsonBody: { ok: true, id: "sil-1" } }));
     vi.stubGlobal("fetch", fetchMock);
@@ -152,6 +165,34 @@ describe("lib/api unit", () => {
 
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("http://api.local/api/policies/audit?policy=maintenance&limit=25");
+  });
+
+  it("calls policy versions endpoint with encoded query", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mockResponse({ jsonBody: { policy: "maintenance", entries: [], count: 0 } })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const api = await importApi();
+    await api.getPolicyVersions("maintenance", 10);
+
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://api.local/api/policies/versions?policy=maintenance&limit=10");
+  });
+
+  it("sends POST to policy rollback endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mockResponse({ jsonBody: { ok: true, policy: "maintenance", rolled_back_from: "v-1", version_id: "v-2" } })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const api = await importApi();
+    await api.rollbackPolicyVersion("maintenance", "v-1");
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://api.local/api/policies/rollback");
+    expect(init.method).toBe("POST");
+    expect(init.body).toBe('{\"policy\":\"maintenance\",\"version_id\":\"v-1\"}');
   });
 
   it("throws detailed error text for non-ok responses", async () => {
