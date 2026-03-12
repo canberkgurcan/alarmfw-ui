@@ -7,22 +7,10 @@ declare module "next-auth" {
     user: {
       name: string;
       role: "admin" | "operator" | "readonly";
-      apiKey: string;
-      obsApiKey: string;
     } & DefaultSession["user"];
   }
   interface User {
     role: "admin" | "operator" | "readonly";
-    apiKey: string;
-    obsApiKey: string;
-  }
-}
-
-declare module "next-auth/jwt" {
-  interface JWT {
-    role: "admin" | "operator" | "readonly";
-    apiKey: string;
-    obsApiKey: string;
   }
 }
 
@@ -32,28 +20,24 @@ const ROLE_MAP: Array<{
   role: "admin" | "operator" | "readonly";
   passwordEnv: string;
   apiKeyEnv: string;
-  obsApiKeyEnv: string;
 }> = [
   {
     username: "admin",
     role: "admin",
     passwordEnv: "UI_ADMIN_PASSWORD",
     apiKeyEnv: "ALARMFW_API_KEY_ADMIN",
-    obsApiKeyEnv: "ALARMFW_API_KEY_ADMIN",
   },
   {
     username: "operator",
     role: "operator",
     passwordEnv: "UI_OPERATOR_PASSWORD",
     apiKeyEnv: "ALARMFW_API_KEY_OPERATOR",
-    obsApiKeyEnv: "ALARMFW_API_KEY_OPERATOR",
   },
   {
     username: "readonly",
     role: "readonly",
     passwordEnv: "UI_READONLY_PASSWORD",
     apiKeyEnv: "ALARMFW_API_KEY_READONLY",
-    obsApiKeyEnv: "ALARMFW_API_KEY_READONLY",
   },
 ];
 
@@ -75,17 +59,17 @@ const config: NextAuthConfig = {
           if (username !== entry.username) continue;
           if (password !== expected) return null; // username matches but wrong pw → fail fast
 
-          // Resolve API key: role-specific key, with fallback to legacy ALARMFW_API_KEY for admin
+          // Validate that env is properly configured before authorizing
           const apiKey =
             (process.env[entry.apiKeyEnv] ?? "").trim() ||
             (entry.role === "admin" ? (process.env.ALARMFW_API_KEY ?? "").trim() : "");
+          if (!apiKey) return null; // env not configured for this role → reject login
 
           return {
             id: entry.username,
             name: entry.username,
             role: entry.role,
-            apiKey,
-            obsApiKey: apiKey, // observe servis şimdilik aynı key kullanıyor
+            // API key intentionally NOT included in session — resolved server-side in proxy routes
           };
         }
         return null;
@@ -111,15 +95,11 @@ const config: NextAuthConfig = {
     async jwt({ token, user }) {
       if (user) {
         token.role = user.role;
-        token.apiKey = user.apiKey;
-        token.obsApiKey = user.obsApiKey;
       }
       return token;
     },
     async session({ session, token }) {
-      session.user.role = token.role;
-      session.user.apiKey = token.apiKey;
-      session.user.obsApiKey = token.obsApiKey;
+      session.user.role = token.role as "admin" | "operator" | "readonly";
       return session;
     },
   },

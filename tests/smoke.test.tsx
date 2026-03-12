@@ -8,6 +8,10 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/dashboard",
 }));
 
+vi.mock("next-auth/react", () => ({
+  signOut: vi.fn(),
+}));
+
 vi.mock("next/link", () => ({
   default: ({
     href,
@@ -58,30 +62,30 @@ describe("Sidebar", () => {
   });
 
   it("renders brand name", () => {
-    render(<Sidebar />);
+    render(<Sidebar username="admin" role="admin" />);
     expect(screen.getByText("AlarmFW")).toBeInTheDocument();
   });
 
   it("renders top nav links", () => {
-    render(<Sidebar />);
+    render(<Sidebar username="admin" role="admin" />);
     expect(screen.getByText("Dashboard")).toBeInTheDocument();
     expect(screen.getByText("Monitor")).toBeInTheDocument();
     expect(screen.getByText("Observe")).toBeInTheDocument();
   });
 
   it("renders Manage toggle button", () => {
-    render(<Sidebar />);
+    render(<Sidebar username="admin" role="admin" />);
     expect(screen.getByText("Manage")).toBeInTheDocument();
   });
 
   it("Manage section is collapsed by default on non-manage path", () => {
-    render(<Sidebar />);
+    render(<Sidebar username="admin" role="admin" />);
     expect(screen.queryByText("Checks")).not.toBeInTheDocument();
     expect(screen.queryByText("Secrets")).not.toBeInTheDocument();
   });
 
   it("clicking Manage reveals sub-navigation items", () => {
-    render(<Sidebar />);
+    render(<Sidebar username="admin" role="admin" />);
     const manageBtn = screen.getByText("Manage").closest("button")!;
     fireEvent.click(manageBtn);
     expect(screen.getByText("Checks")).toBeInTheDocument();
@@ -93,7 +97,7 @@ describe("Sidebar", () => {
   });
 
   it("clicking Manage twice collapses the section again", () => {
-    render(<Sidebar />);
+    render(<Sidebar username="admin" role="admin" />);
     const manageBtn = screen.getByText("Manage").closest("button")!;
     fireEvent.click(manageBtn);
     expect(screen.getByText("Checks")).toBeInTheDocument();
