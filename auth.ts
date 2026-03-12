@@ -1,6 +1,8 @@
 import NextAuth, { type NextAuthConfig, type DefaultSession } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 
+type UserRole = "admin" | "operator" | "readonly";
+
 // ── Session type augmentation ─────────────────────────
 declare module "next-auth" {
   interface Session {
@@ -12,6 +14,10 @@ declare module "next-auth" {
   interface User {
     role: "admin" | "operator" | "readonly";
   }
+}
+
+function normalizeRole(value: unknown): UserRole {
+  return value === "admin" || value === "operator" || value === "readonly" ? value : "readonly";
 }
 
 // ── Role → API key mapping ────────────────────────────
@@ -96,10 +102,11 @@ const config: NextAuthConfig = {
       if (user) {
         token.role = user.role;
       }
+      token.role = normalizeRole(token.role);
       return token;
     },
     async session({ session, token }) {
-      session.user.role = token.role as "admin" | "operator" | "readonly";
+      session.user.role = normalizeRole(token.role);
       return session;
     },
   },

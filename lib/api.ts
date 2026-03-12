@@ -334,6 +334,11 @@ export const getObserveEvents = (cluster: string, namespace: string, pod?: strin
   return obsReq<ObserveEvent[]>(`/api/observe/events?${q.toString()}`);
 };
 
+export const getObservePodLogs = (cluster: string, namespace: string, pod: string, tailLines = 200) => {
+  const q = new URLSearchParams({ cluster, namespace, pod, tail_lines: String(tailLines) });
+  return obsReq<{ ok: boolean; pod: string; logs: string }>(`/api/observe/pod-logs?${q.toString()}`);
+};
+
 export const runObservePromQL = (cluster: string, query: string, time?: string) =>
   obsReq<PromQLResult>("/api/observe/promql", {
     method: "POST",

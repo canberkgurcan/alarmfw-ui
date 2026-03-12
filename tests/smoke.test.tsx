@@ -55,6 +55,7 @@ describe("StatusBadge", () => {
 // ── Sidebar ────────────────────────────────────────────────────────────────
 
 import Sidebar from "@/components/Sidebar";
+import { signOut } from "next-auth/react";
 
 describe("Sidebar", () => {
   beforeEach(() => {
@@ -103,6 +104,37 @@ describe("Sidebar", () => {
     expect(screen.getByText("Checks")).toBeInTheDocument();
     fireEvent.click(manageBtn);
     expect(screen.queryByText("Checks")).not.toBeInTheDocument();
+  });
+
+  it("hides Manage section for readonly role", () => {
+    render(<Sidebar username="readonly" role="readonly" />);
+    expect(screen.queryByText("Manage")).not.toBeInTheDocument();
+    expect(screen.queryByText("Checks")).not.toBeInTheDocument();
+    expect(screen.queryByText("Secrets")).not.toBeInTheDocument();
+  });
+});
+
+// ── ProfileMenu ────────────────────────────────────────────────────────────
+
+import ProfileMenu from "@/components/ProfileMenu";
+
+describe("ProfileMenu", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("opens dropdown and shows user info", () => {
+    render(<ProfileMenu username="admin" role="admin" />);
+    fireEvent.click(screen.getByRole("button", { name: "Open profile menu" }));
+    expect(screen.getAllByText("admin").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Çıkış yap")).toBeInTheDocument();
+  });
+
+  it("triggers signOut on logout click", () => {
+    render(<ProfileMenu username="operator" role="operator" />);
+    fireEvent.click(screen.getByRole("button", { name: "Open profile menu" }));
+    fireEvent.click(screen.getByText("Çıkış yap"));
+    expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
   });
 });
 

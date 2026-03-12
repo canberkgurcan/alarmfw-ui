@@ -14,7 +14,10 @@ function resolveApiKey(role: string): string {
 
 async function handler(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const session = await auth();
-  if (!session) return new Response("Unauthorized", { status: 401 });
+  const role = session?.user?.role;
+  if (!session || !session.user || !role) return new Response("Unauthorized", { status: 401 });
+  const apiKey = resolveApiKey(role);
+  if (!apiKey) return new Response("API key is not configured for this role", { status: 500 });
 
   const { path } = await params;
   const reqUrl = new URL(req.url);
@@ -27,8 +30,8 @@ async function handler(req: NextRequest, { params }: { params: Promise<{ path: s
     const val = req.headers.get(name);
     if (val) headers.set(name, val);
   }
-  headers.set("X-API-Key", resolveApiKey(session.user.role));
-  headers.set("X-Actor", session.user.name ?? "");
+  headers.set("X-API-Key", apiKey);
+  headers.set("X-Actor", session.user.name ?? role);
 
   const hasBody = req.method !== "GET" && req.method !== "HEAD";
   const upstream = await fetch(targetUrl, {

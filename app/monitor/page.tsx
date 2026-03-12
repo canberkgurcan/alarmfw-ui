@@ -6,14 +6,158 @@ import {
   getMonitorNamespaces,
   getMonitorClusters,
   getObservePods,
+  getObservePodLogs,
+  getObserveEvents,
   triggerRun,
   getLastRun,
   MonitorSnapshot,
   PodInfo,
+  ObserveEvent,
 } from "@/lib/api";
 
 // pod adı → güncel restart sayısı
 type LiveRestarts = Record<string, number>;
+
+// ── PodDetailModal ────────────────────────────────────────────────────────────
+
+interface ModalState {
+  type: "logs" | "events";
+  pod: string;
+  cluster: string;
+  namespace: string;
+}
+
+function downloadTxt(filename: string, content: string) {
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function PodDetailModal({
+  modal,
+  onClose,
+}: {
+  modal: ModalState;
+  onClose: () => void;
+}) {
+  const [content, setContent] = useState<string | null>(null);
+  const [events, setEvents] = useState<ObserveEvent[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+    setContent(null);
+    setEvents(null);
+
+    if (modal.type === "logs") {
+      getObservePodLogs(modal.cluster, modal.namespace, modal.pod)
+        .then((r) => { if (!cancelled) setContent(r.logs); })
+        .catch((e) => { if (!cancelled) setError(String(e)); })
+        .finally(() => { if (!cancelled) setLoading(false); });
+    } else {
+      getObserveEvents(modal.cluster, modal.namespace, modal.pod)
+        .then((r) => { if (!cancelled) setEvents(r); })
+        .catch((e) => { if (!cancelled) setError(String(e)); })
+        .finally(() => { if (!cancelled) setLoading(false); });
+    }
+
+    return () => { cancelled = true; };
+  }, [modal]);
+
+  const handleDownload = () => {
+    const filename = `${modal.pod}-${modal.type}.txt`;
+    if (modal.type === "logs" && content !== null) {
+      downloadTxt(filename, content);
+    } else if (modal.type === "events" && events !== null) {
+      const lines = events.map((e) =>
+        [e.last_time, e.type, e.reason, e.message].filter(Boolean).join("\t")
+      );
+      downloadTxt(filename, lines.join("\n"));
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-white rounded-lg shadow-xl w-[800px] max-w-[95vw] max-h-[80vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b">
+          <div>
+            <span className="font-semibold text-sm capitalize">{modal.type}</span>
+            <span className="text-gray-400 mx-2">—</span>
+            <span className="font-mono text-sm text-gray-700">{modal.pod}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {(content !== null || events !== null) && (
+              <button
+                onClick={handleDownload}
+                className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded border text-gray-700"
+              >
+                ↓ TXT indir
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="px-3 py-1 text-xs bg-red-50 hover:bg-red-100 rounded border text-red-600"
+            >
+              Kapat
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-auto p-4">
+          {loading && <p className="text-sm text-gray-400">Yükleniyor...</p>}
+          {error && <p className="text-sm text-red-600">{error}</p>}
+
+          {modal.type === "logs" && content !== null && (
+            <pre className="text-xs font-mono whitespace-pre-wrap text-gray-800 leading-relaxed">
+              {content || "(log yok)"}
+            </pre>
+          )}
+
+          {modal.type === "events" && events !== null && (
+            events.length === 0 ? (
+              <p className="text-sm text-gray-400 italic">Event bulunamadı.</p>
+            ) : (
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 text-gray-500 uppercase tracking-wide">
+                    {["Zaman", "Tür", "Reason", "Mesaj", "Sayı"].map((h) => (
+                      <th key={h} className="px-2 py-1.5 text-left border-b whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {events.map((ev, i) => (
+                    <tr key={i} className={`border-b ${ev.type === "Warning" ? "bg-orange-50" : ""}`}>
+                      <td className="px-2 py-1.5 whitespace-nowrap text-gray-500">{ev.last_time ? new Date(ev.last_time).toLocaleString("tr-TR") : "—"}</td>
+                      <td className="px-2 py-1.5">
+                        <span className={`font-semibold ${ev.type === "Warning" ? "text-orange-600" : "text-blue-600"}`}>{ev.type}</span>
+                      </td>
+                      <td className="px-2 py-1.5 font-mono">{ev.reason}</td>
+                      <td className="px-2 py-1.5 max-w-[360px]">{ev.message}</td>
+                      <td className="px-2 py-1.5 text-center">{ev.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -51,7 +195,15 @@ function ts(utc: string) {
 
 // ── PodTable ─────────────────────────────────────────────────────────────────
 
-function PodTable({ pods, liveRestarts }: { pods: PodInfo[]; liveRestarts: LiveRestarts }) {
+function PodTable({
+  pods,
+  liveRestarts,
+  onOpen,
+}: {
+  pods: PodInfo[];
+  liveRestarts: LiveRestarts;
+  onOpen: (type: "logs" | "events", pod: string) => void;
+}) {
   if (!pods.length)
     return <p className="text-sm text-gray-400 italic">Pod yok</p>;
   return (
@@ -59,7 +211,7 @@ function PodTable({ pods, liveRestarts }: { pods: PodInfo[]; liveRestarts: LiveR
       <table className="w-full text-xs border-collapse">
         <thead>
           <tr className="bg-gray-50 text-gray-500 uppercase tracking-wide">
-            {["Pod", "Ready", "Restarts", "Phase", "Waiting / Terminated", "Node", "Workload", "Image", "Oluşturma"].map(
+            {["Pod", "Ready", "Restarts", "Phase", "Waiting / Terminated", "Node", "Workload", "Image", "Oluşturma", ""].map(
               (h) => (
                 <th key={h} className="px-2 py-1.5 text-left border-b whitespace-nowrap">
                   {h}
@@ -102,6 +254,22 @@ function PodTable({ pods, liveRestarts }: { pods: PodInfo[]; liveRestarts: LiveR
                   {p.image || "—"}
                 </td>
                 <td className="px-2 py-1.5 whitespace-nowrap">{p.created_at || "—"}</td>
+                <td className="px-2 py-1.5 whitespace-nowrap">
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => onOpen("logs", p.pod)}
+                      className="px-2 py-0.5 text-[10px] font-medium rounded border border-gray-300 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 transition-colors"
+                    >
+                      Log
+                    </button>
+                    <button
+                      onClick={() => onOpen("events", p.pod)}
+                      className="px-2 py-0.5 text-[10px] font-medium rounded border border-gray-300 hover:bg-orange-50 hover:border-orange-400 hover:text-orange-700 transition-colors"
+                    >
+                      Event
+                    </button>
+                  </div>
+                </td>
               </tr>
             );
           })}
@@ -116,6 +284,7 @@ function PodTable({ pods, liveRestarts }: { pods: PodInfo[]; liveRestarts: LiveR
 function SnapshotCard({ snap }: { snap: MonitorSnapshot }) {
   const [open, setOpen] = useState(true);
   const [liveRestarts, setLiveRestarts] = useState<LiveRestarts>({});
+  const [modal, setModal] = useState<ModalState | null>(null);
 
   useEffect(() => {
     getObservePods(snap.cluster, snap.namespace)
@@ -129,30 +298,41 @@ function SnapshotCard({ snap }: { snap: MonitorSnapshot }) {
       .catch(() => {});
   }, [snap.cluster, snap.namespace]);
 
+  const handleOpen = (type: "logs" | "events", pod: string) => {
+    setModal({ type, pod, cluster: snap.cluster, namespace: snap.namespace });
+  };
+
   return (
-    <div className="border rounded-lg bg-white shadow-sm mb-3">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-4 py-3 text-left"
-      >
-        <div className="flex items-center gap-3">
-          {statusBadge(snap.status)}
-          <span className="font-semibold text-sm">{snap.namespace}</span>
-          <span className="text-gray-400 text-sm">@</span>
-          <span className="text-blue-600 text-sm font-mono">{snap.cluster}</span>
-          <span className="text-gray-400 text-xs ml-2">{snap.pods.length} pod</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <span className="text-gray-400 text-xs">{ts(snap.timestamp_utc)}</span>
-          <span className="text-gray-400 text-xs">{open ? "▲" : "▼"}</span>
-        </div>
-      </button>
-      {open && (
-        <div className="px-4 pb-4">
-          <PodTable pods={snap.pods} liveRestarts={liveRestarts} />
-        </div>
-      )}
-    </div>
+    <>
+      {modal && <PodDetailModal modal={modal} onClose={() => setModal(null)} />}
+      <div className="border rounded-lg bg-white shadow-sm mb-3">
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="w-full flex items-center justify-between px-4 py-3 text-left"
+        >
+          <div className="flex items-center gap-3">
+            {statusBadge(snap.status)}
+            <span className="font-semibold text-sm">{snap.namespace}</span>
+            <span className="text-gray-400 text-sm">@</span>
+            <span className="text-blue-600 text-sm font-mono">{snap.cluster}</span>
+            <span className="text-gray-400 text-xs ml-2">{snap.pods.length} pod</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-gray-400 text-xs">{ts(snap.timestamp_utc)}</span>
+            <span className="text-gray-400 text-xs">{open ? "▲" : "▼"}</span>
+          </div>
+        </button>
+        {open && (
+          <div className="px-4 pb-4">
+            <PodTable
+              pods={snap.pods}
+              liveRestarts={liveRestarts}
+              onOpen={handleOpen}
+            />
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 

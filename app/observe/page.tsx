@@ -26,13 +26,66 @@ import PanelControlPlane from "./PanelControlPlane";
 
 type Tab = "overview" | "alerts" | "nodes" | "workload" | "capacity" | "controlplane" | "pods" | "events" | "promql";
 
-const QUICK_QUERIES = [
-  { label: "Top 10 CPU kullanan pod",    query: 'topk(10, sum(rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[5m])) by (pod, namespace))' },
-  { label: "Top 10 Memory kullanan pod", query: 'topk(10, sum(container_memory_working_set_bytes{container!="",container!="POD"}) by (pod, namespace))' },
-  { label: "Restart > 5 containerlar",  query: "kube_pod_container_status_restarts_total > 5" },
-  { label: "Failed pod'lar",            query: 'kube_pod_status_phase{phase="Failed"} == 1' },
-  { label: "Node CPU kullanımı (%)",    query: '100 - (avg by (node) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)' },
-  { label: "Firing alertler",           query: 'ALERTS{alertstate="firing"}' },
+type PromValueKind = "cpu_cores" | "bytes" | "count" | "percent" | "state" | "raw";
+
+type QuickQueryDef = {
+  label: string;
+  query: string;
+  description: string;
+  interpretation: string;
+  valueKind: PromValueKind;
+  unitLabel: string;
+};
+
+const QUICK_QUERIES: QuickQueryDef[] = [
+  {
+    label: "Top 10 CPU kullanan pod",
+    query: 'topk(10, sum(rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[5m])) by (pod, namespace))',
+    description: "Son 5 dakikada CPU'yu en çok tüketen podları listeler.",
+    interpretation: "Yüksek değer daha fazla CPU tüketimi anlamına gelir; ani artışlar throttling riski doğurabilir.",
+    valueKind: "cpu_cores",
+    unitLabel: "core",
+  },
+  {
+    label: "Top 10 Memory kullanan pod",
+    query: 'topk(10, sum(container_memory_working_set_bytes{container!="",container!="POD"}) by (pod, namespace))',
+    description: "Bellek kullanımına göre en yüksek 10 podu gösterir.",
+    interpretation: "Sürekli yüksek bellek tüketimi OOMKilled riskini artırır.",
+    valueKind: "bytes",
+    unitLabel: "bytes",
+  },
+  {
+    label: "Restart > 5 containerlar",
+    query: "kube_pod_container_status_restarts_total > 5",
+    description: "5'ten fazla restart atan containerları bulur.",
+    interpretation: "Sık restart, uygulama crash'i veya probe hatasına işaret eder.",
+    valueKind: "count",
+    unitLabel: "adet",
+  },
+  {
+    label: "Failed pod'lar",
+    query: 'kube_pod_status_phase{phase="Failed"} == 1',
+    description: "Durumu Failed olan podları listeler.",
+    interpretation: "Sonuçta görünen her satır müdahale gerektiren başarısız podu temsil eder.",
+    valueKind: "state",
+    unitLabel: "durum",
+  },
+  {
+    label: "Node CPU kullanımı (%)",
+    query: '100 - (avg by (node) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)',
+    description: "Node bazında CPU kullanım yüzdesini verir.",
+    interpretation: "Uzun süre %80+ seyreden node'larda kapasite baskısı olabilir.",
+    valueKind: "percent",
+    unitLabel: "%",
+  },
+  {
+    label: "Firing alertler",
+    query: 'ALERTS{alertstate="firing"}',
+    description: "Aktif (firing) alarm kurallarını listeler.",
+    interpretation: "Her satır şu anda tetiklenmiş bir alarmı gösterir.",
+    valueKind: "state",
+    unitLabel: "durum",
+  },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -51,6 +104,34 @@ function fmtMem(val: string): string {
   if (v >= 1_073_741_824) return `${(v / 1_073_741_824).toFixed(1)} GiB`;
   if (v >= 1_048_576)     return `${(v / 1_048_576).toFixed(0)} MiB`;
   return `${(v / 1024).toFixed(0)} KiB`;
+}
+
+function fmtPromValue(rawVal: string | undefined, kind: PromValueKind): string {
+  if (!rawVal) return "—";
+  const v = parseFloat(rawVal);
+  if (isNaN(v)) return rawVal;
+  if (kind === "cpu_cores") return fmtCpu(rawVal);
+  if (kind === "bytes") return fmtMem(rawVal);
+  if (kind === "percent") return `${v.toFixed(1)}%`;
+  if (kind === "count") return Number.isInteger(v) ? `${v}` : v.toFixed(2);
+  if (kind === "state") return v === 1 ? "Aktif" : `${v}`;
+  return rawVal;
+}
+
+function summarizeMetric(metric: Record<string, string>): string {
+  const keys = ["namespace", "pod", "container", "node", "alertname", "severity", "instance"] as const;
+  const parts: string[] = [];
+  for (const key of keys) {
+    const val = metric[key];
+    if (val) parts.push(`${key}: ${val}`);
+  }
+  return parts.length > 0 ? parts.join(" · ") : "Etiket yok";
+}
+
+function metricAsLabelText(metric: Record<string, string>): string {
+  const entries = Object.entries(metric);
+  if (entries.length === 0) return "{}";
+  return `{${entries.map(([k, v]) => `${k}="${v}"`).join(", ")}}`;
 }
 
 /** ISO 8601 UTC string'i Istanbul (GMT+3) olarak formatlar */
@@ -234,6 +315,7 @@ function PromQLPanel({ cluster }: { cluster: string }) {
   const [query, setQuery]   = useState("");
   const [result, setResult] = useState<PromQLResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const matchedQuery = QUICK_QUERIES.find((q) => q.query === query.trim()) ?? null;
 
   const run = async () => {
     if (!query.trim()) return;
@@ -246,7 +328,11 @@ function PromQLPanel({ cluster }: { cluster: string }) {
   return (
     <div className="flex flex-col h-full">
       <div className="flex gap-2 px-5 py-3 border-b shrink-0 flex-wrap items-center">
-        <select className="border rounded px-2 py-1.5 text-sm text-gray-600 bg-white" value="" onChange={(e) => { if (e.target.value) setQuery(e.target.value); }}>
+        <select
+          className="border rounded px-2 py-1.5 text-sm text-gray-600 bg-white"
+          value={matchedQuery?.query ?? ""}
+          onChange={(e) => setQuery(e.target.value)}
+        >
           <option value="">Hazır sorgular</option>
           {QUICK_QUERIES.map((q) => <option key={q.label} value={q.query}>{q.label}</option>)}
         </select>
@@ -257,6 +343,19 @@ function PromQLPanel({ cluster }: { cluster: string }) {
           {loading ? "..." : "Çalıştır"}
         </button>
       </div>
+      <div className="px-5 py-2.5 border-b bg-blue-50/40 text-xs">
+        {matchedQuery ? (
+          <div className="space-y-1 text-gray-700">
+            <p><span className="font-semibold">Sorgu:</span> {matchedQuery.label}</p>
+            <p><span className="font-semibold">Ne gösterir:</span> {matchedQuery.description}</p>
+            <p><span className="font-semibold">Nasıl yorumlanır:</span> {matchedQuery.interpretation}</p>
+          </div>
+        ) : (
+          <p className="text-gray-500">
+            Hazır sorgu seçerseniz bu alanda sorgunun anlamı ve yorum bilgisi görünür.
+          </p>
+        )}
+      </div>
       <div className="flex-1 min-h-0 overflow-auto">
         {result && (
           !result.ok ? <p className="text-red-600 text-sm p-4">{result.error}</p> :
@@ -264,15 +363,23 @@ function PromQLPanel({ cluster }: { cluster: string }) {
             <table className="w-full text-xs border-collapse">
               <thead className="sticky top-0 z-10 bg-gray-50">
                 <tr className="text-gray-500 uppercase tracking-wide">
-                  <th className="px-3 py-2 text-left border-b">Metrik</th>
-                  <th className="px-3 py-2 text-left border-b">Değer</th>
+                  <th className="px-3 py-2 text-left border-b">Kaynak</th>
+                  <th className="px-3 py-2 text-left border-b">
+                    Değer ({matchedQuery?.unitLabel ?? "ham"})
+                  </th>
+                  <th className="px-3 py-2 text-left border-b">Ham Değer</th>
+                  <th className="px-3 py-2 text-left border-b">Etiketler</th>
                 </tr>
               </thead>
               <tbody>
                 {result.result.map((r, i) => (
                   <tr key={i} className="border-b hover:bg-gray-50">
-                    <td className="px-3 py-1.5 font-mono text-gray-600 max-w-[500px] break-all">{`{${Object.entries(r.metric).map(([k, v]) => `${k}="${v}"`).join(", ")}}`}</td>
-                    <td className="px-3 py-1.5 font-semibold">{r.value ? r.value[1] : "—"}</td>
+                    <td className="px-3 py-1.5 text-gray-700 max-w-[380px] break-words">{summarizeMetric(r.metric)}</td>
+                    <td className="px-3 py-1.5 font-semibold whitespace-nowrap">
+                      {fmtPromValue(r.value?.[1], matchedQuery?.valueKind ?? "raw")}
+                    </td>
+                    <td className="px-3 py-1.5 font-mono text-gray-500 whitespace-nowrap">{r.value ? r.value[1] : "—"}</td>
+                    <td className="px-3 py-1.5 font-mono text-gray-600 max-w-[560px] break-all">{metricAsLabelText(r.metric)}</td>
                   </tr>
                 ))}
               </tbody>
