@@ -343,8 +343,7 @@ export default function ObservePage() {
   const [nsSummary, setNsSummary]     = useState<NamespaceSummary | null>(null);
   const [selectedPod, setSelectedPod] = useState<ObservePod | null>(null);
 
-  // events tab
-  const [selNsEv, setSelNsEv]   = useState("");
+  // events tab — namespace gelir global selNs'den
   const [selPodEv, setSelPodEv] = useState("");
   const [events, setEvents]     = useState<ObserveEvent[]>([]);
   const [evLoading, setEvLoading] = useState(false);
@@ -392,7 +391,7 @@ export default function ObservePage() {
   }, []);
 
   useEffect(() => { if (auth?.logged_in) loadClustersAndNamespaces(); }, [auth?.logged_in, loadClustersAndNamespaces]);
-  useEffect(() => { setSelNs(""); setSelNsEv(""); setPods([]); setEvents([]); setNsSummary(null); }, [selCluster]);
+  useEffect(() => { setSelNs(""); setSelNs(""); setPods([]); setEvents([]); setNsSummary(null); }, [selCluster]);
 
   // ── Namespace summary ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -413,12 +412,12 @@ export default function ObservePage() {
 
   // ── Event yükleme ──────────────────────────────────────────────────────────
   const loadEvents = useCallback(async () => {
-    if (!selCluster || !selNsEv) { setEvents([]); return; }
+    if (!selCluster || !selNs) { setEvents([]); return; }
     setEvLoading(true); setEvError("");
-    try { setEvents(await getObserveEvents(selCluster, selNsEv, selPodEv || undefined)); }
+    try { setEvents(await getObserveEvents(selCluster, selNs, selPodEv || undefined)); }
     catch (e: unknown) { setEvError(String(e)); setEvents([]); }
     finally { setEvLoading(false); }
-  }, [selCluster, selNsEv, selPodEv]);
+  }, [selCluster, selNs, selPodEv]);
 
   useEffect(() => { loadEvents(); }, [loadEvents]);
 
@@ -431,7 +430,7 @@ export default function ObservePage() {
   }, []);
 
   function goToEvents(pod: string, ns: string) {
-    setSelNsEv(ns); setSelPodEv(pod); setTab("events");
+    setSelNs(ns); setSelPodEv(pod); setTab("events");
   }
 
   if (auth === null) {
@@ -546,7 +545,7 @@ export default function ObservePage() {
               <div className="px-5 py-3 border-b shrink-0 flex items-center gap-3 flex-wrap">
                 <div className="flex items-center gap-2">
                   <label className="text-sm text-gray-600 font-medium">Namespace</label>
-                  <select value={selNsEv} onChange={(e) => { setSelNsEv(e.target.value); setSelPodEv(""); }} className="border rounded px-3 py-1.5 text-sm w-48" disabled={!selCluster}>
+                  <select value={selNs} onChange={(e) => { setSelNs(e.target.value); setSelPodEv(""); }} className="border rounded px-3 py-1.5 text-sm w-48" disabled={!selCluster}>
                     <option value="">— Seç —</option>
                     {namespaces.map((n) => <option key={n} value={n}>{n}</option>)}
                   </select>
@@ -555,7 +554,7 @@ export default function ObservePage() {
                   <label className="text-sm text-gray-600 font-medium">Pod</label>
                   <input value={selPodEv} onChange={(e) => setSelPodEv(e.target.value)} placeholder="opsiyonel" className="border rounded px-3 py-1.5 text-sm font-mono w-48" />
                 </div>
-                {selNsEv && <button onClick={loadEvents} className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50">↻</button>}
+                {selNs && <button onClick={loadEvents} className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50">↻</button>}
                 {evError && <span className="text-red-600 text-sm">{evError}</span>}
               </div>
               <div className="flex-1 min-h-0 overflow-auto">
