@@ -6,6 +6,7 @@
 //   DEPLOY_NAMESPACE — Deploy namespace              (örn: alarmfw-prod)
 //   OCP_APPS_DOMAIN  — OCP apps domain               (örn: apps.cluster.local)
 //                      NEXT_PUBLIC_* URL'leri bu domain üzerinden türetilir
+//   ALARMFW_API_KEY  — alarmfw-api için X-API-Key (opsiyonel; API auth açıksa gerekli)
 
 pipeline {
     agent any
@@ -28,6 +29,7 @@ pipeline {
                     docker build \
                         --build-arg NEXT_PUBLIC_API_URL=https://alarmfw-api.${OCP_APPS_DOMAIN} \
                         --build-arg NEXT_PUBLIC_OBSERVE_URL=https://alarmfw-observe.${OCP_APPS_DOMAIN} \
+                        --build-arg NEXT_PUBLIC_ALARMFW_API_KEY=${ALARMFW_API_KEY} \
                         -t ${FULL_IMAGE} .
                 """
             }

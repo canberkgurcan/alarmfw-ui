@@ -12,6 +12,7 @@ const TOP_NAV = [
 const MANAGE_NAV = [
   { href: "/checks",         label: "Checks",         icon: "✓" },
   { href: "/config",         label: "Config",         icon: "⊞" },
+  { href: "/maintenance",    label: "Maintenance",    icon: "🕒" },
   { href: "/run",            label: "Run",            icon: "▶" },
   { href: "/secrets",        label: "Secrets",        icon: "🔑" },
   { href: "/admin-console",  label: "Admin Console",  icon: "⌨" },

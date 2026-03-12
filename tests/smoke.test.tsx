@@ -86,6 +86,7 @@ describe("Sidebar", () => {
     fireEvent.click(manageBtn);
     expect(screen.getByText("Checks")).toBeInTheDocument();
     expect(screen.getByText("Config")).toBeInTheDocument();
+    expect(screen.getByText("Maintenance")).toBeInTheDocument();
     expect(screen.getByText("Run")).toBeInTheDocument();
     expect(screen.getByText("Secrets")).toBeInTheDocument();
     expect(screen.getByText("Admin Console")).toBeInTheDocument();

@@ -10,9 +10,23 @@ const OBSERVE_BASE =
     ? (process.env.OBSERVE_URL ?? "http://alarmfw-observe:8001")
     : (process.env.NEXT_PUBLIC_OBSERVE_URL ?? "http://localhost:8001");
 
+const API_KEY =
+  typeof window === "undefined"
+    ? (process.env.ALARMFW_API_KEY ?? "")
+    : (process.env.NEXT_PUBLIC_ALARMFW_API_KEY ?? "");
+
+const API_ACTOR =
+  typeof window === "undefined"
+    ? (process.env.ALARMFW_ACTOR ?? "")
+    : (process.env.NEXT_PUBLIC_ALARMFW_ACTOR ?? "");
+
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers ?? {});
+  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  if (API_KEY && !headers.has("X-API-Key")) headers.set("X-API-Key", API_KEY);
+  if (API_ACTOR && !headers.has("X-Actor")) headers.set("X-Actor", API_ACTOR);
   const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers,
     cache: "no-store",
     ...init,
   });
@@ -76,6 +90,38 @@ export const upsertObserveCluster = (name: string, body: ObserveClusterConfig) =
   req<{ ok: boolean }>(`/api/config/observe-clusters/${name}`, { method: "PUT", body: JSON.stringify(body) });
 export const deleteObserveCluster = (name: string) =>
   req<{ ok: boolean }>(`/api/config/observe-clusters/${name}`, { method: "DELETE" });
+
+// ── Policies / Maintenance ─────────────────────────────
+export const getMaintenancePolicy = () =>
+  req<MaintenancePolicy>("/api/policies/maintenance");
+
+export const updateMaintenancePolicy = (body: MaintenancePolicy) =>
+  req<{ ok: boolean; silences: number }>("/api/policies/maintenance", {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+
+export const createMaintenanceSilence = (body: MaintenanceSilence) =>
+  req<{ ok: boolean; id: string }>("/api/policies/maintenance/silences", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const dryRunMaintenanceSilence = (silence: MaintenanceSilence, atUtc?: string) =>
+  req<MaintenanceDryRunResult>("/api/policies/maintenance/silences/dry-run", {
+    method: "POST",
+    body: JSON.stringify(atUtc ? { silence, at_utc: atUtc } : { silence }),
+  });
+
+export const getPolicyAudit = (policy = "maintenance", limit = 50) =>
+  req<PolicyAuditList>(
+    `/api/policies/audit?policy=${encodeURIComponent(policy)}&limit=${encodeURIComponent(String(limit))}`
+  );
+
+export const deleteMaintenanceSilence = (id: string) =>
+  req<{ ok: boolean; id: string }>(`/api/policies/maintenance/silences/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
 
 // ── Types ─────────────────────────────────────────────
 export type Status = "OK" | "PROBLEM" | "ERROR";
@@ -155,10 +201,65 @@ export interface ObserveClusterConfig {
   prometheus_token_file?: string;
 }
 
+export interface MaintenanceSilence {
+  id?: string;
+  enabled?: boolean;
+  alarm_name?: string;
+  cluster?: string;
+  namespace?: string;
+  starts_at_utc: string;
+  ends_at_utc: string;
+  allow_recovery?: boolean;
+  reason?: string;
+}
+
+export interface MaintenancePolicy {
+  silences: MaintenanceSilence[];
+}
+
+export interface MaintenanceDryRunMatch {
+  alarm_name: string;
+  cluster: string;
+  namespace: string;
+  check_name: string;
+  check_type: string;
+  source_file: string;
+}
+
+export interface MaintenanceDryRunResult {
+  ok: boolean;
+  active: boolean;
+  evaluated_at_utc: string;
+  total_candidates: number;
+  matched: number;
+  matches: MaintenanceDryRunMatch[];
+}
+
+export interface PolicyAuditEntry {
+  id: string;
+  ts_utc: string;
+  actor: string;
+  client_ip?: string;
+  policy: string;
+  action: string;
+  resource: string;
+  summary: string;
+  changes?: Record<string, unknown>;
+}
+
+export interface PolicyAuditList {
+  entries: PolicyAuditEntry[];
+  count: number;
+}
+
 // ── Observe ───────────────────────────────────────────
 async function obsReq<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers ?? {});
+  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  if (API_KEY && !headers.has("X-API-Key")) headers.set("X-API-Key", API_KEY);
+  if (API_ACTOR && !headers.has("X-Actor")) headers.set("X-Actor", API_ACTOR);
   const res = await fetch(`${OBSERVE_BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers,
     cache: "no-store",
     ...init,
   });
