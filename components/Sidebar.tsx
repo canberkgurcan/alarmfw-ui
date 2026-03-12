@@ -64,26 +64,30 @@ export default function Sidebar({ username, role }: SidebarProps) {
           <NavLink key={n.href} href={n.href} label={n.label} icon={n.icon} />
         ))}
 
-        {/* Manage group */}
-        <button
-          onClick={() => setManageOpen((o) => !o)}
-          className={`w-full flex items-center gap-3 px-5 py-2.5 text-sm transition-colors
-            ${manageActive
-              ? "text-blue-400"
-              : "text-white/60 hover:bg-sidebar-hover hover:text-white"
-            }`}
-        >
-          <span className="text-base w-5 text-center">⚙</span>
-          <span className="flex-1 text-left">Manage</span>
-          <span className="text-xs opacity-60">{manageOpen ? "▲" : "▼"}</span>
-        </button>
+        {/* Manage group — hidden for readonly */}
+        {role !== "readonly" && (
+          <>
+            <button
+              onClick={() => setManageOpen((o) => !o)}
+              className={`w-full flex items-center gap-3 px-5 py-2.5 text-sm transition-colors
+                ${manageActive
+                  ? "text-blue-400"
+                  : "text-white/60 hover:bg-sidebar-hover hover:text-white"
+                }`}
+            >
+              <span className="text-base w-5 text-center">⚙</span>
+              <span className="flex-1 text-left">Manage</span>
+              <span className="text-xs opacity-60">{manageOpen ? "▲" : "▼"}</span>
+            </button>
 
-        {manageOpen && (
-          <div>
-            {MANAGE_NAV.map((n) => (
-              <NavLink key={n.href} href={n.href} label={n.label} icon={n.icon} indent />
-            ))}
-          </div>
+            {manageOpen && (
+              <div>
+                {MANAGE_NAV.map((n) => (
+                  <NavLink key={n.href} href={n.href} label={n.label} icon={n.icon} indent />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </nav>
 
