@@ -2,8 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   getNamespaces, upsertNamespace, deleteNamespace,
-  getClusters, upsertCluster, deleteCluster, generateConfig,
-  uploadSecretText,
+  getClusters, generateConfig,
   type Namespace, type Cluster,
 } from "@/lib/api";
 
@@ -15,17 +14,12 @@ const EMPTY_NS: Namespace = {
   mail_to: "", mail_cc: "",
 };
 
-const EMPTY_CL: Cluster = { name: "", ocp_api: "", insecure: true };
-
 export default function ConfigPage() {
   const [namespaces, setNamespaces] = useState<Namespace[]>([]);
   const [clusters,   setClusters]   = useState<Cluster[]>([]);
   const [nsEdit,     setNsEdit]     = useState<Namespace | null>(null);
-  const [clEdit,     setClEdit]     = useState<Cluster | null>(null);
-  const [clToken,    setClToken]    = useState("");
   const [msg,        setMsg]        = useState("");
   const [saving,     setSaving]     = useState(false);
-  const [tab,        setTab]        = useState<"ns" | "cl">("ns");
 
   const load = useCallback(async () => {
     const [ns, cl] = await Promise.all([
@@ -40,7 +34,6 @@ export default function ConfigPage() {
 
   function flash(m: string) { setMsg(m); setTimeout(() => setMsg(""), 4000); }
 
-  // ── Namespace save ──────────────────────────────────
   async function saveNs() {
     if (!nsEdit) return;
     if (!nsEdit.name.trim()) { flash("Namespace adı gerekli"); return; }
@@ -59,36 +52,6 @@ export default function ConfigPage() {
     if (!confirm(`"${name}" namespace'ini sil?`)) return;
     try {
       await deleteNamespace(name);
-      flash(`Silindi: ${name}`);
-      await load();
-    } catch (e: unknown) {
-      flash(`Hata: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  }
-
-  // ── Cluster save ────────────────────────────────────
-  async function saveCl() {
-    if (!clEdit) return;
-    if (!clEdit.name.trim()) { flash("Cluster adı gerekli"); return; }
-    setSaving(true);
-    try {
-      await upsertCluster(clEdit.name.trim(), clEdit);
-      if (clToken.trim()) {
-        await uploadSecretText(clEdit.name.trim(), clToken.trim());
-      }
-      flash(`✓ Cluster kaydedildi`);
-      setClEdit(null);
-      setClToken("");
-      await load();
-    } catch (e: unknown) {
-      flash(`Hata: ${e instanceof Error ? e.message : String(e)}`);
-    } finally { setSaving(false); }
-  }
-
-  async function deleteCl(name: string) {
-    if (!confirm(`"${name}" cluster'ını sil?`)) return;
-    try {
-      await deleteCluster(name);
       flash(`Silindi: ${name}`);
       await load();
     } catch (e: unknown) {
@@ -117,133 +80,63 @@ export default function ConfigPage() {
 
       {msg && <div className="mb-4 px-4 py-2 rounded bg-blue-50 text-blue-700 text-sm">{msg}</div>}
 
-      {/* Tabs */}
-      <div className="flex gap-1 mb-5 border-b">
-        {(["ns", "cl"] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-5 py-2 text-sm font-medium border-b-2 transition-colors ${
-              tab === t ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}>
-            {t === "ns" ? `Namespaces (${namespaces.length})` : `Clusters (${clusters.length})`}
-          </button>
-        ))}
+      <div className="flex justify-end mb-3">
+        <button onClick={() => setNsEdit({ ...EMPTY_NS })}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+          + Namespace Ekle
+        </button>
       </div>
 
-      {/* ── Namespaces ── */}
-      {tab === "ns" && (
-        <div>
-          <div className="flex justify-end mb-3">
-            <button onClick={() => setNsEdit({ ...EMPTY_NS })}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
-              + Namespace Ekle
-            </button>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-xs uppercase text-gray-500 border-b text-left">
-                  <th className="px-4 py-3">Namespace</th>
-                  <th className="px-4 py-3">Cluster(lar)</th>
-                  <th className="px-4 py-3">Enabled</th>
-                  <th className="px-4 py-3">Zabbix</th>
-                  <th className="px-4 py-3">Mail</th>
-                  <th className="px-4 py-3">Node</th>
-                  <th className="px-4 py-3">Severity</th>
-                  <th className="px-4 py-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {namespaces.length === 0 && (
-                  <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">Namespace yok</td></tr>
-                )}
-                {namespaces.map((ns) => (
-                  <tr key={ns.name} className="border-t hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium">{ns.name}</td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">{ns.clusters.join(", ") || "—"}</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${ns.namespace_enabled ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                        {ns.namespace_enabled ? "Yes" : "No"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded text-xs ${ns.zabbix_enabled ? "bg-blue-100 text-blue-700" : "text-gray-400"}`}>
-                        {ns.zabbix_enabled ? "✓" : "—"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded text-xs ${ns.mail_enabled ? "bg-purple-100 text-purple-700" : "text-gray-400"}`}>
-                        {ns.mail_enabled ? "✓" : "—"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">{ns.node || "—"}</td>
-                    <td className="px-4 py-3 text-gray-600">{ns.severity}</td>
-                    <td className="px-4 py-3 flex gap-2">
-                      <button onClick={() => setNsEdit({ ...ns })}
-                        className="text-xs px-3 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100">Düzenle</button>
-                      <button onClick={() => deleteNs(ns.name)}
-                        className="text-xs px-3 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100">Sil</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ── Clusters ── */}
-      {tab === "cl" && (
-        <div>
-          <div className="flex justify-end mb-3">
-            <button onClick={() => { setClEdit({ ...EMPTY_CL }); setClToken(""); }}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
-              + Cluster Ekle
-            </button>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-xs uppercase text-gray-500 border-b text-left">
-                  <th className="px-4 py-3">Cluster</th>
-                  <th className="px-4 py-3">API URL</th>
-                  <th className="px-4 py-3">TLS Skip</th>
-                  <th className="px-4 py-3">Token</th>
-                  <th className="px-4 py-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {clusters.length === 0 && (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">Cluster yok</td></tr>
-                )}
-                {clusters.map((cl) => (
-                  <tr key={cl.name} className="border-t hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium">{cl.name}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-gray-500">{cl.ocp_api || "—"}</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded text-xs ${cl.insecure ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-500"}`}>
-                        {cl.insecure ? "skip" : "verify"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${cl.has_token_file ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
-                        {cl.has_token_file ? "✓ var" : "✗ yok"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 flex gap-2">
-                      <button onClick={() => { setClEdit({ ...cl }); setClToken(""); }}
-                        className="text-xs px-3 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100">Düzenle</button>
-                      <button onClick={() => deleteCl(cl.name)}
-                        className="text-xs px-3 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100">Sil</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      <div className="bg-white rounded-lg shadow-sm border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 text-xs uppercase text-gray-500 border-b text-left">
+              <th className="px-4 py-3">Namespace</th>
+              <th className="px-4 py-3">Cluster(lar)</th>
+              <th className="px-4 py-3">Enabled</th>
+              <th className="px-4 py-3">Zabbix</th>
+              <th className="px-4 py-3">Mail</th>
+              <th className="px-4 py-3">Node</th>
+              <th className="px-4 py-3">Severity</th>
+              <th className="px-4 py-3"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {namespaces.length === 0 && (
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">Namespace yok</td></tr>
+            )}
+            {namespaces.map((ns) => (
+              <tr key={ns.name} className="border-t hover:bg-gray-50">
+                <td className="px-4 py-3 font-medium">{ns.name}</td>
+                <td className="px-4 py-3 text-gray-500 text-xs">{ns.clusters.join(", ") || "—"}</td>
+                <td className="px-4 py-3">
+                  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${ns.namespace_enabled ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                    {ns.namespace_enabled ? "Yes" : "No"}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <span className={`px-2 py-0.5 rounded text-xs ${ns.zabbix_enabled ? "bg-blue-100 text-blue-700" : "text-gray-400"}`}>
+                    {ns.zabbix_enabled ? "✓" : "—"}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <span className={`px-2 py-0.5 rounded text-xs ${ns.mail_enabled ? "bg-purple-100 text-purple-700" : "text-gray-400"}`}>
+                    {ns.mail_enabled ? "✓" : "—"}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-gray-600">{ns.node || "—"}</td>
+                <td className="px-4 py-3 text-gray-600">{ns.severity}</td>
+                <td className="px-4 py-3 flex gap-2">
+                  <button onClick={() => setNsEdit({ ...ns })}
+                    className="text-xs px-3 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100">Düzenle</button>
+                  <button onClick={() => deleteNs(ns.name)}
+                    className="text-xs px-3 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100">Sil</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {/* ── Namespace Modal ── */}
       {nsEdit && (
@@ -261,7 +154,7 @@ export default function ConfigPage() {
               <Field label="Cluster(lar)">
                 <div className="border rounded p-2 space-y-1 max-h-36 overflow-y-auto bg-white">
                   {clusters.length === 0 && (
-                    <p className="text-xs text-gray-400 px-1">Önce Clusters tabından cluster ekle</p>
+                    <p className="text-xs text-gray-400 px-1">Önce Secrets sayfasından cluster ekle</p>
                   )}
                   {clusters.map((cl) => (
                     <label key={cl.name} className="flex items-center gap-2 cursor-pointer px-1 py-0.5 rounded hover:bg-gray-50 text-sm">
@@ -328,43 +221,6 @@ export default function ConfigPage() {
                 {saving ? "Kaydediliyor…" : "Kaydet"}
               </button>
               <button onClick={() => setNsEdit(null)}
-                className="px-5 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 text-sm">İptal</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Cluster Modal ── */}
-      {clEdit && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
-            <h2 className="text-lg font-bold mb-5">
-              {clusters.find(c => c.name === clEdit.name) ? `Düzenle: ${clEdit.name}` : "Yeni Cluster"}
-            </h2>
-            <div className="space-y-4">
-              <Field label="Cluster Adı">
-                <input value={clEdit.name} onChange={(e) => setClEdit({ ...clEdit, name: e.target.value })}
-                  disabled={!!clusters.find(c => c.name === clEdit.name)}
-                  className="input font-mono" placeholder="esy2-digital" />
-              </Field>
-              <Field label="OCP API URL">
-                <input value={clEdit.ocp_api} onChange={(e) => setClEdit({ ...clEdit, ocp_api: e.target.value })}
-                  className="input font-mono" placeholder="https://api.cluster.example.com:6443" />
-              </Field>
-              <Field label="Token">
-                <input type="password" value={clToken} onChange={(e) => setClToken(e.target.value)}
-                  className="input font-mono"
-                  placeholder={clusters.find(c => c.name === clEdit.name) ? "Değiştirmek için yeni token gir (boş bırakınca mevcut korunur)" : "oc whoami -t"} />
-              </Field>
-              <Toggle label="TLS Verify'ı Atla (insecure)" checked={clEdit.insecure}
-                onChange={(v) => setClEdit({ ...clEdit, insecure: v })} />
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button onClick={saveCl} disabled={saving}
-                className="px-5 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm disabled:opacity-50">
-                {saving ? "Kaydediliyor…" : "Kaydet"}
-              </button>
-              <button onClick={() => setClEdit(null)}
                 className="px-5 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 text-sm">İptal</button>
             </div>
           </div>

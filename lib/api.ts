@@ -42,6 +42,28 @@ export const getAlarms = (limit = 50, status?: string) =>
   req<Alarm[]>(`/api/alarms?limit=${limit}${status ? `&status=${status}` : ""}`);
 
 export const getAlarmState = () => req<AlarmState[]>("/api/alarms/state");
+export const getAlarmHistory = (params?: {
+  limit?: number;
+  status?: string;
+  cluster?: string;
+  namespace?: string;
+  alarm_name?: string;
+  dedup_key?: string;
+  since_ts?: number;
+  hours?: number;
+}) => {
+  const q = new URLSearchParams();
+  if (params?.limit != null) q.set("limit", String(params.limit));
+  if (params?.status) q.set("status", params.status);
+  if (params?.cluster) q.set("cluster", params.cluster);
+  if (params?.namespace) q.set("namespace", params.namespace);
+  if (params?.alarm_name) q.set("alarm_name", params.alarm_name);
+  if (params?.dedup_key) q.set("dedup_key", params.dedup_key);
+  if (params?.since_ts != null) q.set("since_ts", String(params.since_ts));
+  if (params?.hours != null) q.set("hours", String(params.hours));
+  const qs = q.toString();
+  return req<AlarmHistoryEvent[]>(`/api/alarms/history${qs ? `?${qs}` : ""}`);
+};
 export const getAlarmMetrics = () => req<AlarmRuntimeMetrics>("/api/alarms/metrics");
 
 // ── Checks ────────────────────────────────────────────
@@ -77,10 +99,6 @@ export const deleteNamespace = (name: string) =>
   req<{ ok: boolean }>(`/api/config/namespaces/${name}`, { method: "DELETE" });
 
 export const getClusters   = () => req<Cluster[]>("/api/config/clusters");
-export const upsertCluster = (name: string, body: Cluster) =>
-  req<{ ok: boolean }>(`/api/config/clusters/${name}`, { method: "PUT", body: JSON.stringify(body) });
-export const deleteCluster = (name: string) =>
-  req<{ ok: boolean }>(`/api/config/clusters/${name}`, { method: "DELETE" });
 
 export const generateConfig = () =>
   req<{ ok: boolean; generated_checks: number }>("/api/config/generate", { method: "POST" });
@@ -157,6 +175,22 @@ export interface AlarmState {
   alarm_name?: string | null;
 }
 
+export interface AlarmHistoryEvent {
+  id: number;
+  event_ts: number;
+  timestamp_utc?: string | null;
+  event_type: "initial" | "opened" | "closed" | "changed" | "unchanged";
+  dedup_key: string;
+  alarm_name?: string | null;
+  status: string;
+  prev_status?: string | null;
+  severity?: string | null;
+  cluster?: string | null;
+  namespace?: string | null;
+  message?: string | null;
+  payload?: Record<string, unknown> | null;
+}
+
 export interface AlarmRuntimeMetrics {
   version: number;
   updated_at_utc: string;
@@ -221,7 +255,7 @@ export interface Cluster {
 export interface ObserveClusterConfig {
   name: string;
   ocp_api: string;
-  insecure?: boolean;
+  insecure: boolean;
   prometheus_url: string;
   prometheus_token_file?: string;
 }
@@ -336,7 +370,7 @@ export const getObserveEvents = (cluster: string, namespace: string, pod?: strin
 
 export const getObservePodLogs = (cluster: string, namespace: string, pod: string, tailLines = 200) => {
   const q = new URLSearchParams({ cluster, namespace, pod, tail_lines: String(tailLines) });
-  return obsReq<{ ok: boolean; pod: string; logs: string }>(`/api/observe/pod-logs?${q.toString()}`);
+  return obsReq<ObservePodLogs>(`/api/observe/pod-logs?${q.toString()}`);
 };
 
 export const runObservePromQL = (cluster: string, query: string, time?: string) =>
@@ -497,6 +531,16 @@ export interface ObserveEvent {
   last_time: string | null;
   object: string | null;
   kind: string | null;
+}
+
+export interface ObservePodLogs {
+  ok: boolean;
+  pod: string;
+  container?: string | null;
+  logs: string;
+  previous: boolean;
+  fallback_used: boolean;
+  fallback_from_status?: number | null;
 }
 
 // ── Terminal ───────────────────────────────────────────

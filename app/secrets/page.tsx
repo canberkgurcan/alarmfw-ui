@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import {
   getSecrets, uploadSecretText, deleteSecret,
   getObserveClusterConfigs, upsertObserveCluster, deleteObserveCluster,
-  upsertCluster,
   type Secret, type ObserveClusterConfig,
 } from "@/lib/api";
 
@@ -39,6 +38,7 @@ export default function SecretsPage() {
   const [ocpToken, setOcpToken] = useState("");
   const [promUrl, setPromUrl]   = useState("");
   const [promToken, setPromToken] = useState("");
+  const [insecure, setInsecure] = useState(true);
 
   async function load() {
     const [s, o] = await Promise.all([
@@ -81,14 +81,14 @@ export default function SecretsPage() {
       if (promToken.trim()) {
         await uploadSecretText(`${name}-prometheus`, promToken.trim());
       }
-      await upsertCluster(name, { name, ocp_api: ocpApi.trim(), insecure: true });
       await upsertObserveCluster(name, {
         name,
         ocp_api: ocpApi.trim(),
+        insecure,
         prometheus_url: promUrl.trim(),
       });
       setMsg(`✓ ${name} kaydedildi`);
-      setCluster(""); setOcpApi(""); setOcpToken(""); setPromUrl(""); setPromToken("");
+      setCluster(""); setOcpApi(""); setOcpToken(""); setPromUrl(""); setPromToken(""); setInsecure(true);
       await load();
     } catch (e: unknown) {
       setMsg(`Hata: ${e instanceof Error ? e.message : String(e)}`);
@@ -117,6 +117,7 @@ export default function SecretsPage() {
     setCluster(name);
     setOcpApi(obs?.ocp_api ?? "");
     setPromUrl(obs?.prometheus_url ?? "");
+    setInsecure(obs?.insecure ?? true);
     setOcpToken("");
     setPromToken("");
     window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
@@ -124,7 +125,7 @@ export default function SecretsPage() {
 
   function resetForm() {
     setCluster(""); setOcpApi(""); setOcpToken("");
-    setPromUrl(""); setPromToken(""); setMsg("");
+    setPromUrl(""); setPromToken(""); setInsecure(true); setMsg("");
   }
 
   return (
@@ -144,6 +145,7 @@ export default function SecretsPage() {
             <tr className="bg-gray-50 text-xs uppercase text-gray-500 border-b text-left">
               <th className="px-4 py-3">Cluster</th>
               <th className="px-4 py-3">OCP API URL</th>
+              <th className="px-4 py-3 text-center">TLS</th>
               <th className="px-4 py-3 text-center">OCP Token</th>
               <th className="px-4 py-3">Prometheus URL</th>
               <th className="px-4 py-3 text-center">Prom. Token</th>
@@ -153,7 +155,7 @@ export default function SecretsPage() {
           <tbody>
             {allClusters.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
                   Henüz cluster eklenmemiş
                 </td>
               </tr>
@@ -166,6 +168,11 @@ export default function SecretsPage() {
                   <td className="px-4 py-3 font-medium">{name}</td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-500 max-w-[200px] truncate" title={obs?.ocp_api}>
                     {obs?.ocp_api ?? <span className="text-orange-400">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <span className={`px-2 py-0.5 rounded text-xs ${obs?.insecure ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-500"}`}>
+                      {obs?.insecure ? "skip" : "verify"}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-center">
                     {tokens.ocp
@@ -242,6 +249,15 @@ export default function SecretsPage() {
               rows={3} placeholder="eyJhbGci... (boş bırakılabilir)"
               className="mt-1 block w-full border rounded px-3 py-2 text-sm font-mono resize-none" />
           </label>
+          <div className="md:col-span-2 pt-1">
+            <label className="flex items-center gap-2 cursor-pointer select-none text-sm">
+              <div onClick={() => setInsecure(!insecure)}
+                className={`w-10 h-5 rounded-full transition-colors flex items-center px-0.5 ${insecure ? "bg-blue-600" : "bg-gray-300"}`}>
+                <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform ${insecure ? "translate-x-5" : "translate-x-0"}`} />
+              </div>
+              <span className="text-gray-700">TLS Verify&apos;ı Atla (insecure)</span>
+            </label>
+          </div>
         </div>
         <div className="mt-5 flex gap-3 items-center flex-wrap">
           <button onClick={save} disabled={saving}
