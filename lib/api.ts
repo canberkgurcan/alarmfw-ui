@@ -99,6 +99,10 @@ export const deleteNamespace = (name: string) =>
   req<{ ok: boolean }>(`/api/config/namespaces/${name}`, { method: "DELETE" });
 
 export const getClusters   = () => req<Cluster[]>("/api/config/clusters");
+export const upsertCluster = (name: string, body: Cluster) =>
+  req<{ ok: boolean }>(`/api/config/clusters/${encodeURIComponent(name)}`, { method: "PUT", body: JSON.stringify(body) });
+export const deleteCluster = (name: string) =>
+  req<{ ok: boolean }>(`/api/config/clusters/${encodeURIComponent(name)}`, { method: "DELETE" });
 
 export const generateConfig = () =>
   req<{ ok: boolean; generated_checks: number }>("/api/config/generate", { method: "POST" });
