@@ -58,7 +58,15 @@ function PodDetailModal({
 
     if (modal.type === "logs") {
       getObservePodLogs(modal.cluster, modal.namespace, modal.pod)
-        .then((r) => { if (!cancelled) setContent(r.logs); })
+        .then((r) => {
+          if (!cancelled) {
+            if (r.unavailable) {
+              setContent(`⚠️ ${r.unavailable_reason ?? "Log mevcut değil."}\n\nPod henüz başlamadı veya container çalışmıyor (ImagePullBackOff, Pending vb.).`);
+            } else {
+              setContent(r.logs ?? "(log yok)");
+            }
+          }
+        })
         .catch((e) => { if (!cancelled) setError(String(e)); })
         .finally(() => { if (!cancelled) setLoading(false); });
     } else {

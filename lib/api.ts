@@ -541,10 +541,12 @@ export interface ObservePodLogs {
   ok: boolean;
   pod: string;
   container?: string | null;
-  logs: string;
+  logs: string | null;
   previous: boolean;
   fallback_used: boolean;
   fallback_from_status?: number | null;
+  unavailable?: boolean;
+  unavailable_reason?: string;
 }
 
 // ── Terminal ───────────────────────────────────────────
