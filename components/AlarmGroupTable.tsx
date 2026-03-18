@@ -46,12 +46,20 @@ function buildGroups(alarms: Alarm[], state: AlarmState[]): GroupRow[] {
     alarmsByName[a.alarm_name].push(a);
   }
 
-  const rows: GroupRow[] = [];
-  const seen = new Set<string>();
-
+  // alarm_name bazında dedup — aynı isimde birden fazla state entry olabilir (farklı dedup_key)
+  // en son değişeni tut
+  const stateByName: Record<string, AlarmState> = {};
   for (const s of state) {
     const name = s.alarm_name ?? s.dedup_key;
-    seen.add(name);
+    const existing = stateByName[name];
+    if (!existing || (s.last_change_ts ?? 0) > (existing.last_change_ts ?? 0)) {
+      stateByName[name] = s;
+    }
+  }
+
+  const rows: GroupRow[] = [];
+
+  for (const [name, s] of Object.entries(stateByName)) {
     rows.push({
       key: name,
       alarm_name: name,
@@ -62,7 +70,7 @@ function buildGroups(alarms: Alarm[], state: AlarmState[]): GroupRow[] {
   }
 
   for (const [name, events] of Object.entries(alarmsByName)) {
-    if (seen.has(name)) continue;
+    if (stateByName[name]) continue;
     rows.push({
       key: name,
       alarm_name: name,
