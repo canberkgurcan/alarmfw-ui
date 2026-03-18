@@ -14,7 +14,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       : "readonly";
 
   return (
-    <AppShell username={user.name ?? ""} role={role}>
+    <AppShell username={user.name ?? ""} role={role} loginAt={user.loginAt}>
       {children}
     </AppShell>
   );
