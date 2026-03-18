@@ -61,7 +61,7 @@ function PodDetailModal({
         .then((r) => {
           if (!cancelled) {
             if (r.unavailable) {
-              setContent(`⚠️ ${r.unavailable_reason ?? "Log mevcut değil."}\n\nPod henüz başlamadı veya container çalışmıyor (ImagePullBackOff, Pending vb.).`);
+              setContent(`⚠️ ${r.unavailable_reason ?? "Log mevcut değil."}\n\nContainer şu an başlatılıyor veya CrashLoopBackOff bekleme sürecinde.\nBirkaç saniye sonra tekrar deneyin.`);
             } else {
               setContent(r.logs ?? "(log yok)");
             }
