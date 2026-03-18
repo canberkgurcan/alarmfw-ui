@@ -5,29 +5,23 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
   BarChartOutlined,
+  CaretRightOutlined,
+  CheckSquareOutlined,
+  ClockCircleOutlined,
+  CodeOutlined,
+  KeyOutlined,
+  LogoutOutlined,
   MonitorOutlined,
   RadarChartOutlined,
-  CheckSquareOutlined,
   SettingOutlined,
-  ClockCircleOutlined,
-  CaretRightOutlined,
-  KeyOutlined,
-  CodeOutlined,
   ToolOutlined,
-  LogoutOutlined,
 } from "@ant-design/icons";
-import { Avatar, Button, Divider, Menu, Space, Tag, Typography } from "antd";
+import { Button, Menu, Typography } from "antd";
 import type { MenuProps } from "antd";
 
 const { Text } = Typography;
 
 type UserRole = "admin" | "operator" | "readonly";
-
-const ROLE_COLOR: Record<UserRole, string> = {
-  admin: "blue",
-  operator: "gold",
-  readonly: "default",
-};
 
 const ALL_KEYS = [
   "/dashboard",
@@ -102,37 +96,17 @@ export default function Sidebar({ username, role }: SidebarProps) {
         />
       </div>
 
-      <Divider style={{ margin: "0 0 12px 0" }} />
-      <div className="px-4 pb-4">
-        <Space direction="vertical" size={8} className="w-full">
-          <Space>
-            <Avatar
-              size={28}
-              style={{ backgroundColor: "var(--alarmfw-color-primary)", fontSize: 12, fontWeight: 600 }}
-            >
-              {(username?.[0] || "U").toUpperCase()}
-            </Avatar>
-            <Space direction="vertical" size={0}>
-              <Text style={{ fontSize: 12 }} strong>
-                {username}
-              </Text>
-              <Tag color={ROLE_COLOR[role]} style={{ fontSize: 10, lineHeight: "16px", marginInlineEnd: 0 }}>
-                {role}
-              </Tag>
-            </Space>
-          </Space>
-          <Button
-            type="text"
-            danger
-            size="small"
-            icon={<LogoutOutlined />}
-            onClick={() => signOut({ callbackUrl: "/login" })}
-            block
-            style={{ justifyContent: "flex-start" }}
-          >
-            Çıkış yap
-          </Button>
-        </Space>
+      <div className="px-3 pb-4">
+        <Button
+          type="text"
+          size="small"
+          icon={<LogoutOutlined />}
+          onClick={() => signOut({ callbackUrl: "/login" })}
+          block
+          style={{ justifyContent: "flex-start", color: "#8c939d" }}
+        >
+          Çıkış yap
+        </Button>
       </div>
     </div>
   );
