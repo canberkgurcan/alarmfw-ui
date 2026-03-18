@@ -1,9 +1,9 @@
 import type { Status } from "@/lib/api";
 
 const MAP: Record<string, string> = {
-  OK:      "bg-green-100 text-green-700",
+  OK: "bg-green-100 text-green-700",
   PROBLEM: "bg-red-100 text-red-700",
-  ERROR:   "bg-orange-100 text-orange-700",
+  ERROR: "bg-orange-100 text-orange-700",
 };
 
 export default function StatusBadge({ status }: { status: string }) {

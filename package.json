@@ -10,6 +10,8 @@
     "test:watch": "~/.nvm/versions/node/v20.20.0/bin/node ./node_modules/.bin/vitest"
   },
   "dependencies": {
+    "@ant-design/icons": "^5",
+    "antd": "^5",
     "next": "15.3.9",
     "next-auth": "^5.0.0-beta.30",
     "react": "^19.0.0",
