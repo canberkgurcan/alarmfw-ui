@@ -9,6 +9,7 @@ declare module "next-auth" {
     user: {
       name: string;
       role: "admin" | "operator" | "readonly";
+      loginAt?: number;
     } & DefaultSession["user"];
   }
   interface User {
@@ -103,12 +104,14 @@ const config: NextAuthConfig = {
     async jwt({ token, user }) {
       if (user) {
         token.role = user.role;
+        token.loginAt = Date.now();
       }
       token.role = normalizeRole(token.role);
       return token;
     },
     async session({ session, token }) {
       session.user.role = normalizeRole(token.role);
+      session.user.loginAt = token.loginAt as number | undefined;
       return session;
     },
   },

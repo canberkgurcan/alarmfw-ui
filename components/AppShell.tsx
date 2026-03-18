@@ -75,10 +75,12 @@ export default function AppShell({
   children,
   username,
   role,
+  loginAt,
 }: {
   children: React.ReactNode;
   username: string;
   role: UserRole;
+  loginAt?: number;
 }) {
   const pathname = usePathname();
   const screens = useBreakpoint();
@@ -107,7 +109,7 @@ export default function AppShell({
       {screens.lg ? (
         <Sider width={312} className="!bg-transparent px-4 py-4">
           <div className="sticky top-4">
-            <Sidebar username={username} role={role} />
+            <Sidebar role={role} />
           </div>
         </Sider>
       ) : (
@@ -120,7 +122,7 @@ export default function AppShell({
           onClose={() => setNavOpen(false)}
           styles={{ body: { padding: 12, background: "transparent" } }}
         >
-          <Sidebar username={username} role={role} />
+          <Sidebar role={role} />
         </Drawer>
       )}
 
@@ -153,7 +155,7 @@ export default function AppShell({
                     </p>
                   </div>
                 </div>
-                <ProfileMenu username={username || role} role={role} />
+                <ProfileMenu username={username || role} role={role} loginAt={loginAt} />
               </div>
             </div>
 

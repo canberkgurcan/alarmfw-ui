@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut } from "next-auth/react";
 import {
   BarChartOutlined,
   CaretRightOutlined,
@@ -10,13 +9,12 @@ import {
   ClockCircleOutlined,
   CodeOutlined,
   KeyOutlined,
-  LogoutOutlined,
   MonitorOutlined,
   RadarChartOutlined,
   SettingOutlined,
   ToolOutlined,
 } from "@ant-design/icons";
-import { Button, Menu, Typography } from "antd";
+import { Menu, Typography } from "antd";
 import type { MenuProps } from "antd";
 
 const { Text } = Typography;
@@ -38,11 +36,10 @@ const ALL_KEYS = [
 const MANAGE_KEYS = ["/checks", "/config", "/maintenance", "/run", "/secrets", "/admin-console"];
 
 interface SidebarProps {
-  username: string;
   role: UserRole;
 }
 
-export default function Sidebar({ username, role }: SidebarProps) {
+export default function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname();
   const selectedKey = ALL_KEYS.find((p) => pathname.startsWith(p)) ?? "";
 
@@ -96,18 +93,6 @@ export default function Sidebar({ username, role }: SidebarProps) {
         />
       </div>
 
-      <div className="px-3 pb-4">
-        <Button
-          type="text"
-          size="small"
-          icon={<LogoutOutlined />}
-          onClick={() => signOut({ callbackUrl: "/login" })}
-          block
-          style={{ justifyContent: "flex-start", color: "#8c939d" }}
-        >
-          Çıkış yap
-        </Button>
-      </div>
     </div>
   );
 }
