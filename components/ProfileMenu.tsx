@@ -3,7 +3,7 @@
 import { signOut } from "next-auth/react";
 import { Avatar, Dropdown, Space, Tag, Typography } from "antd";
 import type { MenuProps } from "antd";
-import { LogoutOutlined } from "@ant-design/icons";
+import { DownOutlined, LogoutOutlined } from "@ant-design/icons";
 
 const { Text } = Typography;
 
@@ -21,19 +21,6 @@ export default function ProfileMenu({ username, role }: { username: string; role
 
   const items: MenuProps["items"] = [
     {
-      key: "info",
-      label: (
-        <Space direction="vertical" size={4} style={{ padding: "4px 0" }}>
-          <Text strong style={{ fontSize: 13 }}>
-            {safeName}
-          </Text>
-          <Tag color={ROLE_COLOR[role]}>{role}</Tag>
-        </Space>
-      ),
-      disabled: true,
-    },
-    { type: "divider" },
-    {
       key: "logout",
       icon: <LogoutOutlined />,
       label: "Çıkış yap",
@@ -44,12 +31,22 @@ export default function ProfileMenu({ username, role }: { username: string; role
 
   return (
     <Dropdown menu={{ items }} trigger={["click"]} placement="bottomRight">
-      <Avatar
-        size={36}
-        style={{ backgroundColor: "var(--alarmfw-color-primary)", cursor: "pointer", fontSize: 14, fontWeight: 600 }}
+      <Space
+        style={{ cursor: "pointer", padding: "6px 10px", borderRadius: 10, background: "rgba(255,255,255,0.7)", border: "1px solid #e3eaf4" }}
       >
-        {avatarText}
-      </Avatar>
+        <Avatar size={28} style={{ backgroundColor: "#155eef", fontSize: 12, fontWeight: 600, flexShrink: 0 }}>
+          {avatarText}
+        </Avatar>
+        <Space direction="vertical" size={0} style={{ lineHeight: 1 }}>
+          <Text strong style={{ fontSize: 12, display: "block" }}>
+            {safeName}
+          </Text>
+          <Tag color={ROLE_COLOR[role]} style={{ fontSize: 10, lineHeight: "16px", marginInlineEnd: 0 }}>
+            {role}
+          </Tag>
+        </Space>
+        <DownOutlined style={{ fontSize: 11, color: "#667085" }} />
+      </Space>
     </Dropdown>
   );
 }
